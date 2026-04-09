@@ -1,0 +1,286 @@
+/* ═══════════════════════════════════════════════════
+   TANKS — Battle Arena
+   ═══════════════════════════════════════════════════ */
+
+:root {
+  --clr-bg: #0a0c10;
+  --clr-panel: #12151c;
+  --clr-border: #1e2a3a;
+  --clr-accent: #00e5ff;
+  --clr-accent2: #ff3d71;
+  --clr-gold: #ffd740;
+  --clr-green: #00e676;
+  --clr-text: #c8d6e5;
+  --clr-text-dim: #576574;
+  --glow-accent: 0 0 20px rgba(0,229,255,.3), 0 0 60px rgba(0,229,255,.1);
+  --glow-red: 0 0 20px rgba(255,61,113,.3), 0 0 60px rgba(255,61,113,.1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--clr-bg);
+  font-family: 'Share Tech Mono', monospace;
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: center;
+  height: 100vh; overflow: hidden;
+  color: var(--clr-text);
+}
+
+/* ── Main Menu ─────────────────────────────────── */
+
+#menu {
+  position: absolute; inset: 0; z-index: 100;
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: center;
+  background: var(--clr-bg);
+  transition: opacity .4s, visibility .4s;
+}
+#menu.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+#menu-bg {
+  position: absolute; inset: 0; overflow: hidden; opacity: .12;
+}
+#menu-bg canvas { width: 100%; height: 100%; }
+
+.menu-content { position: relative; z-index: 1; text-align: center; }
+
+.game-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 72px; font-weight: 900;
+  letter-spacing: 12px;
+  background: linear-gradient(135deg, var(--clr-accent), var(--clr-gold));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 30px rgba(0,229,255,.4));
+  margin-bottom: 8px;
+  animation: titlePulse 3s ease-in-out infinite;
+}
+
+@keyframes titlePulse {
+  0%,100% { filter: drop-shadow(0 0 30px rgba(0,229,255,.4)); }
+  50% { filter: drop-shadow(0 0 50px rgba(0,229,255,.6)); }
+}
+
+.game-subtitle {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 14px; letter-spacing: 8px;
+  color: var(--clr-text-dim);
+  text-transform: uppercase;
+  margin-bottom: 60px;
+}
+
+/* ── Buttons ───────────────────────────────────── */
+
+.btn {
+  display: block; width: 280px; margin: 0 auto 16px;
+  padding: 16px 32px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 16px; font-weight: 700;
+  letter-spacing: 3px; text-transform: uppercase;
+  border: 2px solid var(--clr-border);
+  background: var(--clr-panel);
+  color: var(--clr-text);
+  cursor: pointer;
+  transition: all .2s;
+  position: relative; overflow: hidden;
+}
+.btn::before {
+  content: ''; position: absolute;
+  top: 0; left: -100%; width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0,229,255,.08), transparent);
+  transition: left .4s;
+}
+.btn:hover::before { left: 100%; }
+.btn:hover {
+  border-color: var(--clr-accent);
+  color: var(--clr-accent);
+  box-shadow: var(--glow-accent);
+  transform: translateY(-2px);
+}
+.btn.primary {
+  border-color: var(--clr-accent);
+  background: linear-gradient(135deg, rgba(0,229,255,.15), rgba(0,229,255,.05));
+  color: var(--clr-accent);
+}
+.btn.primary:hover {
+  background: linear-gradient(135deg, rgba(0,229,255,.25), rgba(0,229,255,.1));
+  box-shadow: 0 0 30px rgba(0,229,255,.4), 0 0 80px rgba(0,229,255,.15);
+}
+
+/* ── Controls Hint ─────────────────────────────── */
+
+.controls-hint {
+  margin-top: 48px;
+  display: flex; gap: 40px; justify-content: center;
+  color: var(--clr-text-dim); font-size: 13px;
+}
+.controls-hint div { text-align: center; }
+.controls-hint kbd {
+  display: inline-block;
+  padding: 4px 10px; margin: 2px;
+  background: var(--clr-panel);
+  border: 1px solid var(--clr-border);
+  border-radius: 4px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px; color: var(--clr-accent);
+  min-width: 28px; text-align: center;
+}
+.controls-hint .label {
+  display: block; margin-top: 6px;
+  font-size: 11px; text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+/* ── Pause Overlay ─────────────────────────────── */
+
+#pause-overlay {
+  position: absolute; inset: 0; z-index: 90;
+  display: none; flex-direction: column;
+  justify-content: center; align-items: center;
+  background: rgba(10,12,16,.85);
+  backdrop-filter: blur(6px);
+}
+#pause-overlay.active { display: flex; }
+
+.pause-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 48px; font-weight: 900;
+  color: var(--clr-accent);
+  letter-spacing: 10px;
+  text-shadow: var(--glow-accent);
+  margin-bottom: 40px;
+}
+
+/* ── HUD ───────────────────────────────────────── */
+
+#hud {
+  position: absolute; top: 0; left: 50%;
+  transform: translateX(-50%);
+  display: none; z-index: 10;
+  pointer-events: none;
+}
+#hud.active { display: flex; }
+
+.hud-bar {
+  display: flex; align-items: center; gap: 32px;
+  padding: 10px 28px;
+  background: linear-gradient(180deg, rgba(18,21,28,.95), rgba(18,21,28,.8));
+  border: 1px solid var(--clr-border);
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  backdrop-filter: blur(8px);
+}
+
+.hud-item { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.hud-label {
+  font-size: 10px; text-transform: uppercase;
+  letter-spacing: 2px; color: var(--clr-text-dim);
+}
+.hud-value {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 18px; font-weight: 700;
+  min-width: 50px;
+}
+#hud-score .hud-value { color: var(--clr-gold); }
+#hud-lives .hud-value { color: var(--clr-accent2); }
+#hud-wave .hud-value  { color: var(--clr-accent); }
+#hud-enemies .hud-value { color: var(--clr-green); }
+
+.hud-sep { width: 1px; height: 28px; background: var(--clr-border); }
+
+/* ── Canvas Wrapper ────────────────────────────── */
+
+#game-wrap {
+  position: relative;
+  border: 2px solid var(--clr-border);
+  border-radius: 4px;
+  box-shadow: 0 0 40px rgba(0,0,0,.5), inset 0 0 40px rgba(0,0,0,.3);
+  line-height: 0;
+}
+
+canvas#c { display: block; border-radius: 2px; }
+
+/* Scanline effect */
+#game-wrap::after {
+  content: ''; position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,0,0,.03) 2px, rgba(0,0,0,.03) 4px
+  );
+  pointer-events: none; border-radius: 2px;
+}
+
+/* ── Game Over ─────────────────────────────────── */
+
+#gameover {
+  position: absolute; inset: 0; z-index: 80;
+  display: none; flex-direction: column;
+  justify-content: center; align-items: center;
+  background: rgba(10,12,16,.9);
+  backdrop-filter: blur(8px);
+}
+#gameover.active { display: flex; }
+
+.go-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 56px; font-weight: 900;
+  letter-spacing: 8px;
+  color: var(--clr-accent2);
+  text-shadow: var(--glow-red);
+  margin-bottom: 20px;
+  animation: goFlicker 2s ease-in-out infinite;
+}
+
+@keyframes goFlicker {
+  0%,100% { opacity: 1; }
+  50% { opacity: .7; }
+}
+
+.go-stats { display: flex; gap: 40px; margin-bottom: 40px; }
+.go-stat { text-align: center; }
+.go-stat .label {
+  font-size: 11px; text-transform: uppercase;
+  letter-spacing: 3px; color: var(--clr-text-dim);
+  margin-bottom: 4px;
+}
+.go-stat .value {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 32px; font-weight: 700;
+  color: var(--clr-gold);
+}
+.go-stat .value.wave-val { color: var(--clr-accent); }
+
+/* ── Minimap ───────────────────────────────────── */
+
+#minimap {
+  position: absolute; bottom: 10px; right: 10px;
+  z-index: 15; pointer-events: none;
+  border: 1px solid var(--clr-border);
+  border-radius: 4px;
+  opacity: .6;
+  display: none;
+}
+#minimap.active { display: block; }
+
+/* ── Connection Status ─────────────────────────── */
+
+#connection-status {
+  position: absolute; bottom: 12px; left: 12px;
+  z-index: 200;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: var(--clr-text-dim);
+  font-family: 'Share Tech Mono', monospace;
+}
+
+#conn-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #ff3d71;
+  transition: background .3s;
+}
+#conn-dot.connected { background: #00e676; box-shadow: 0 0 8px rgba(0,230,118,.5); }
+#conn-dot.connecting { background: #ffd740; animation: blink 1s infinite; }
+
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .3; } }

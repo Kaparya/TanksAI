@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TANKS — Battle Arena</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Main Menu -->
+  <div id="menu">
+    <div id="menu-bg"><canvas id="bgCanvas"></canvas></div>
+    <div class="menu-content">
+      <div class="game-title">TANKS</div>
+      <div class="game-subtitle">Battle Arena</div>
+      <button class="btn primary" id="btn-play">Start Game</button>
+      <button class="btn" id="btn-hard">Hardmode</button>
+      <div class="controls-hint">
+        <div>
+          <kbd>W</kbd><br>
+          <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>
+          <span class="label">Move</span>
+        </div>
+        <div>
+          <kbd>Space</kbd>
+          <span class="label">Shoot</span>
+        </div>
+        <div>
+          <kbd>Esc</kbd>
+          <span class="label">Pause</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pause Overlay -->
+  <div id="pause-overlay">
+    <div class="pause-title">PAUSED</div>
+    <button class="btn primary" id="btn-resume">Resume</button>
+    <button class="btn" id="btn-quit">Quit to Menu</button>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-bar">
+      <div class="hud-item" id="hud-score">
+        <div><div class="hud-label">Score</div><div class="hud-value" id="val-score">0</div></div>
+      </div>
+      <div class="hud-sep"></div>
+      <div class="hud-item" id="hud-lives">
+        <div><div class="hud-label">Lives</div><div class="hud-value" id="val-lives">3</div></div>
+      </div>
+      <div class="hud-sep"></div>
+      <div class="hud-item" id="hud-wave">
+        <div><div class="hud-label">Wave</div><div class="hud-value" id="val-wave">1</div></div>
+      </div>
+      <div class="hud-sep"></div>
+      <div class="hud-item" id="hud-enemies">
+        <div><div class="hud-label">Remaining</div><div class="hud-value" id="val-enemies">0</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Canvas -->
+  <div id="game-wrap">
+    <canvas id="c" width="800" height="600"></canvas>
+    <div id="gameover">
+      <div class="go-title">GAME OVER</div>
+      <div class="go-stats">
+        <div class="go-stat"><div class="label">Final Score</div><div class="value" id="go-score">0</div></div>
+        <div class="go-stat"><div class="label">Wave Reached</div><div class="value wave-val" id="go-wave">1</div></div>
+      </div>
+      <button class="btn primary" id="btn-restart">Play Again</button>
+      <button class="btn" id="btn-menu">Main Menu</button>
+    </div>
+    <canvas id="minimap" width="120" height="90"></canvas>
+  </div>
+
+  <!-- Connection indicator -->
+  <div id="connection-status">
+    <span id="conn-dot"></span>
+    <span id="conn-text">Connecting...</span>
+  </div>
+
+  <script src="js/network.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
