@@ -43,7 +43,9 @@ const Renderer = (() => {
     }
 
     drawWalls(state.walls);
-    drawTank(state.player, true, state.frameCount);
+    if (state.players) {
+      for (const p of state.players) drawTank(p, true, state.frameCount);
+    }
     for (const e of state.enemies) drawTank(e, false, state.frameCount);
     drawBullets(state.bullets);
     drawParticles(state.particles);
@@ -172,20 +174,24 @@ const Renderer = (() => {
   function drawBullets(bullets) {
     if (!bullets) return;
     for (const b of bullets) {
+      const isEnemy = b.owner < 0;
+      const bulletColor = isEnemy ? '#ff5252' : '#ffd740';
+      const glowColor = isEnemy ? 'rgba(255,82,82,.35)' : 'rgba(255,215,64,.35)';
+
       // Bullet body
-      ctx.fillStyle = b.isEnemy ? '#ff5252' : '#ffd740';
+      ctx.fillStyle = bulletColor;
       ctx.beginPath(); ctx.arc(b.x, b.y, 3.5, 0, Math.PI * 2); ctx.fill();
 
       // Glow
       const glowGrad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, 10);
-      glowGrad.addColorStop(0, b.isEnemy ? 'rgba(255,82,82,.35)' : 'rgba(255,215,64,.35)');
+      glowGrad.addColorStop(0, glowColor);
       glowGrad.addColorStop(1, 'transparent');
       ctx.fillStyle = glowGrad;
       ctx.beginPath(); ctx.arc(b.x, b.y, 10, 0, Math.PI * 2); ctx.fill();
 
       // Simple trail
       ctx.globalAlpha = .2;
-      ctx.fillStyle = b.isEnemy ? '#ff5252' : '#ffd740';
+      ctx.fillStyle = bulletColor;
       ctx.beginPath(); ctx.arc(b.x - b.vx, b.y - b.vy, 2.5, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc(b.x - b.vx * 2, b.y - b.vy * 2, 1.5, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1;
@@ -251,9 +257,12 @@ const Renderer = (() => {
       mctx.fillRect(e.x * sx - 2, e.y * sy - 2, 4, 4);
     }
 
-    if (state.player && state.player.alive) {
-      mctx.fillStyle = '#00e676';
-      mctx.fillRect(state.player.x * sx - 2, state.player.y * sy - 2, 4, 4);
+    if (state.players) {
+      for (const p of state.players) {
+        if (!p.alive) continue;
+        mctx.fillStyle = p.color;
+        mctx.fillRect(p.x * sx - 2, p.y * sy - 2, 4, 4);
+      }
     }
   }
 

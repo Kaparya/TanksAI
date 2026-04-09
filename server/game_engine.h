@@ -29,6 +29,8 @@ struct Tank {
     int hp = 1;
     int maxHp = 1;
     int invuln = 0;        // player only
+    int id = -1;           // -1 for enemies, 0 or 1 for players
+    int lives = 0;         // per-player lives
     // AI fields (enemies only)
     int aiTimer = 0;
     int aiDir = 2;
@@ -37,7 +39,7 @@ struct Tank {
 struct Bullet {
     float x, y;
     float vx, vy;
-    bool isEnemy;
+    int owner; // -1 = enemy, 0 = player 0, 1 = player 1
 };
 
 struct Particle {
@@ -58,18 +60,20 @@ enum class GameState { MENU, PLAYING, PAUSED, GAMEOVER };
 
 class GameEngine {
 public:
+    static constexpr int MAX_PLAYERS = 2;
+
     // Map
     int walls[ROWS][COLS];
 
     // Entities
-    Tank player;
+    Tank players[MAX_PLAYERS];
+    bool playerActive[MAX_PLAYERS] = {false, false};
     std::vector<Tank> enemies;
     std::vector<Bullet> bullets;
     std::vector<Particle> particles;
 
     // Progress
     int score = 0;
-    int lives = 3;
     int wave = 1;
     int spawnTimer = 0;
     int enemiesLeft = 0;
@@ -84,17 +88,21 @@ public:
     void resume();
     void restart();
     void quit();
-    void tick(const InputState& input);
+    void tick(const InputState inputs[MAX_PLAYERS]);
     std::string serializeState() const;
+
+    int addPlayer();
+    void removePlayer(int playerId);
+    int numActivePlayers() const;
 
 private:
     void generateWalls();
-    void initPlayer();
+    void initPlayer(int playerId);
     bool wallAt(float px, float py, float size) const;
     bool tankCollide(const Tank* self, float nx, float ny, float size) const;
     bool rectCollide(float ax, float ay, float as, float bx, float by, float bs) const;
     void moveTank(Tank& tank, int dir, float spd);
-    void shoot(Tank& tank, bool isEnemy);
+    void shoot(Tank& tank, int owner);
     bool spawnEnemy();
     void updateEnemyAI(Tank& e);
     void spawnExplosion(float x, float y, const std::string& color, int count);

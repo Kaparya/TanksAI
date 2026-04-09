@@ -7,6 +7,7 @@ const Network = (() => {
   let connected = false;
   let onStateCallback = null;
   let reconnectTimer = null;
+  let myPlayerId = null;
 
   const WS_PORT = 9001; // server listens WS on port+1
 
@@ -34,6 +35,15 @@ const Network = (() => {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        if (data.type === 'welcome') {
+          myPlayerId = data.playerId;
+          console.log('[Network] Assigned player ID:', myPlayerId);
+          return;
+        }
+        if (data.type === 'full') {
+          console.warn('[Network] Server full');
+          return;
+        }
         if (onStateCallback) onStateCallback(data);
       } catch (e) {
         console.warn('[Network] Bad message:', e);
@@ -42,6 +52,7 @@ const Network = (() => {
 
     ws.onclose = () => {
       connected = false;
+      myPlayerId = null;
       console.log('[Network] Disconnected');
       UI.setConnectionStatus('disconnected');
       scheduleReconnect();
@@ -81,10 +92,11 @@ const Network = (() => {
 
   function onState(cb) { onStateCallback = cb; }
   function isConnected() { return connected; }
+  function getMyPlayerId() { return myPlayerId; }
 
   return {
     connect, send, sendInput, sendStart,
     sendPause, sendResume, sendRestart, sendQuit,
-    onState, isConnected
+    onState, isConnected, getMyPlayerId
   };
 })();

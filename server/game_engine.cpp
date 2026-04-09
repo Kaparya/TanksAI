@@ -24,7 +24,8 @@ void GameEngine::generateWalls() {
         int x = 2 + std::rand() % (COLS - 4);
         int y = 2 + std::rand() % (ROWS - 4);
         if (std::abs(x - 10) < 2 && std::abs(y - 7) < 2) continue;
-        if (x < 3 && y > ROWS - 5) continue;
+        if (x < 3 && y > ROWS - 5) continue;              // player 0 spawn
+        if (x > COLS - 4 && y > ROWS - 5) continue;        // player 1 spawn
         walls[y][x] = randf() < 0.15f ? 2 : 1;
     }
     for (int i = 0; i < 8; i++) {
@@ -33,26 +34,73 @@ void GameEngine::generateWalls() {
         for (int dx = 0; dx < 2; dx++) for (int dy = 0; dy < 2; dy++) {
             int nx = bx + dx, ny = by + dy;
             if (nx > 0 && nx < COLS-1 && ny > 0 && ny < ROWS-1) {
-                if (nx < 3 && ny > ROWS - 5) continue;
+                if (nx < 3 && ny > ROWS - 5) continue;         // player 0 spawn
+                if (nx > COLS - 4 && ny > ROWS - 5) continue;  // player 1 spawn
                 walls[ny][nx] = 1;
             }
         }
     }
 }
 
-void GameEngine::initPlayer() {
-    player = Tank{};
-    player.x = 1.5f * TILE;
-    player.y = (ROWS - 2.5f) * TILE;
-    player.dir = 0;
-    player.color = "#00e676";
-    player.speed = 2.5f;
-    player.bulletSpeed = 5.0f;
-    player.cooldown = 15;
-    player.hp = 1;
-    player.maxHp = 1;
-    player.invuln = 90;
-    player.alive = true;
+void GameEngine::initPlayer(int playerId) {
+    Tank& p = players[playerId];
+    p = Tank{};
+    p.id = playerId;
+    p.dir = 0;
+    p.speed = 2.5f;
+    p.bulletSpeed = 5.0f;
+    p.cooldown = 15;
+    p.hp = 1;
+    p.maxHp = 1;
+    p.invuln = 90;
+    p.alive = true;
+    p.lives = hardmode ? 1 : 3;
+
+    if (playerId == 0) {
+        p.x = 1.5f * TILE;
+        p.y = (ROWS - 2.5f) * TILE;
+        p.color = "#00e676";    // green
+    } else {
+        p.x = (COLS - 2.5f) * TILE;
+        p.y = (ROWS - 2.5f) * TILE;
+        p.color = "#00bcd4";    // cyan
+    }
+}
+
+// ── Player management ──────────────────────────────
+
+int GameEngine::addPlayer() {
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        if (!playerActive[i]) {
+            playerActive[i] = true;
+            initPlayer(i);  // always init so serialized data is valid
+            return i;
+        }
+    }
+    return -1; // full
+}
+
+void GameEngine::removePlayer(int playerId) {
+    if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+    playerActive[playerId] = false;
+    players[playerId].alive = false;
+
+    if (state == GameState::PLAYING) {
+        bool anyActive = false;
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            if (playerActive[i]) { anyActive = true; break; }
+        }
+        if (!anyActive) {
+            state = GameState::MENU;
+        }
+    }
+}
+
+int GameEngine::numActivePlayers() const {
+    int count = 0;
+    for (int i = 0; i < MAX_PLAYERS; i++)
+        if (playerActive[i]) count++;
+    return count;
 }
 
 // ── Game lifecycle ──────────────────────────────────
@@ -60,12 +108,13 @@ void GameEngine::initPlayer() {
 void GameEngine::start(bool hard) {
     hardmode = hard;
     generateWalls();
-    initPlayer();
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        if (playerActive[i]) initPlayer(i);
+    }
     enemies.clear();
     bullets.clear();
     particles.clear();
     score = 0;
-    lives = hardmode ? 1 : 3;
     wave = 1;
     spawnTimer = 0;
     enemiesLeft = 4;
@@ -101,9 +150,12 @@ bool GameEngine::wallAt(float px, float py, float size) const {
 }
 
 bool GameEngine::tankCollide(const Tank* self, float nx, float ny, float size) const {
-    // Check against player
-    if (&player != self && player.alive) {
-        if (rectCollide(nx, ny, size, player.x - 14, player.y - 14, 28)) return true;
+    // Check against all players
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        if (!playerActive[i]) continue;
+        const Tank& p = players[i];
+        if (&p == self || !p.alive) continue;
+        if (rectCollide(nx, ny, size, p.x - 14, p.y - 14, 28)) return true;
     }
     for (const auto& e : enemies) {
         if (&e == self || !e.alive) continue;
@@ -124,7 +176,7 @@ void GameEngine::moveTank(Tank& tank, int dir, float spd) {
     }
 }
 
-void GameEngine::shoot(Tank& tank, bool isEnemy) {
+void GameEngine::shoot(Tank& tank, int owner) {
     if (tank.cooldownTimer > 0) return;
     tank.cooldownTimer = tank.cooldown;
     Bullet b;
@@ -132,7 +184,7 @@ void GameEngine::shoot(Tank& tank, bool isEnemy) {
     b.y = tank.y + DY[tank.dir] * 16;
     b.vx = DX[tank.dir] * tank.bulletSpeed;
     b.vy = DY[tank.dir] * tank.bulletSpeed;
-    b.isEnemy = isEnemy;
+    b.owner = owner;
     bullets.push_back(b);
 }
 
@@ -196,11 +248,26 @@ bool GameEngine::spawnEnemy() {
 }
 
 void GameEngine::updateEnemyAI(Tank& e) {
+    // Find closest alive player
+    float targetX = e.x, targetY = e.y;
+    float bestDist = 1e9f;
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        if (!playerActive[i] || !players[i].alive) continue;
+        float dx = players[i].x - e.x;
+        float dy = players[i].y - e.y;
+        float dist = dx * dx + dy * dy;
+        if (dist < bestDist) {
+            bestDist = dist;
+            targetX = players[i].x;
+            targetY = players[i].y;
+        }
+    }
+
     e.aiTimer--;
     if (e.aiTimer <= 0) {
         e.aiTimer = 30 + std::rand() % 60;
-        float dx = player.x - e.x;
-        float dy = player.y - e.y;
+        float dx = targetX - e.x;
+        float dy = targetY - e.y;
         if (randf() < (hardmode ? 0.7f : 0.5f)) {
             if (std::abs(dx) > std::abs(dy)) e.aiDir = dx > 0 ? 1 : 3;
             else e.aiDir = dy > 0 ? 2 : 0;
@@ -210,33 +277,35 @@ void GameEngine::updateEnemyAI(Tank& e) {
     }
     moveTank(e, e.aiDir, e.speed);
 
-    float dx = player.x - e.x;
-    float dy = player.y - e.y;
+    float dx = targetX - e.x;
+    float dy = targetY - e.y;
     bool shouldShoot = false;
     if (e.dir == 0 && dy < 0 && std::abs(dx) < 30) shouldShoot = true;
     if (e.dir == 2 && dy > 0 && std::abs(dx) < 30) shouldShoot = true;
     if (e.dir == 1 && dx > 0 && std::abs(dy) < 30) shouldShoot = true;
     if (e.dir == 3 && dx < 0 && std::abs(dy) < 30) shouldShoot = true;
-    if (shouldShoot || randf() < (hardmode ? 0.035f : 0.02f)) shoot(e, true);
+    if (shouldShoot || randf() < (hardmode ? 0.035f : 0.02f)) shoot(e, -1);
 }
 
 // ── Main tick ───────────────────────────────────────
 
-void GameEngine::tick(const InputState& input) {
+void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
     if (state != GameState::PLAYING) return;
     frameCount++;
 
-    // Player invuln
-    if (player.invuln > 0) player.invuln--;
-
-    // Player input
-    if      (input.up)    moveTank(player, 0, player.speed);
-    else if (input.down)  moveTank(player, 2, player.speed);
-    else if (input.left)  moveTank(player, 3, player.speed);
-    else if (input.right) moveTank(player, 1, player.speed);
-    if (input.shoot) shoot(player, false);
-
-    player.cooldownTimer = std::max(0, player.cooldownTimer - 1);
+    // Player input & invuln
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        if (!playerActive[i] || !players[i].alive) continue;
+        Tank& p = players[i];
+        if (p.invuln > 0) p.invuln--;
+        const InputState& input = inputs[i];
+        if      (input.up)    moveTank(p, 0, p.speed);
+        else if (input.down)  moveTank(p, 2, p.speed);
+        else if (input.left)  moveTank(p, 3, p.speed);
+        else if (input.right) moveTank(p, 1, p.speed);
+        if (input.shoot) shoot(p, i);
+        p.cooldownTimer = std::max(0, p.cooldownTimer - 1);
+    }
     screenShake = std::max(0, screenShake - 1);
 
     // Enemies
@@ -269,8 +338,8 @@ void GameEngine::tick(const InputState& input) {
             bullets.erase(bullets.begin() + i); continue;
         }
 
-        // Hit enemy
-        if (!b.isEnemy) {
+        // Player bullet hits enemy
+        if (b.owner >= 0) {
             bool hit = false;
             for (auto& e : enemies) {
                 if (!e.alive) continue;
@@ -292,23 +361,49 @@ void GameEngine::tick(const InputState& input) {
             if (hit) continue;
         }
 
-        // Hit player
-        if (b.isEnemy && player.alive && player.invuln <= 0) {
-            if (rectCollide(b.x - 3, b.y - 3, 6, player.x - 14, player.y - 14, 28)) {
-                bullets.erase(bullets.begin() + i);
-                spawnExplosion(player.x, player.y, "#00e676", 20);
-                screenShake = 12;
-                lives--;
-                if (lives <= 0) {
-                    state = GameState::GAMEOVER;
-                } else {
-                    player.x = 1.5f * TILE;
-                    player.y = (ROWS - 2.5f) * TILE;
-                    player.dir = 0;
-                    player.invuln = 90;
+        // Bullet hits player (enemy bullets or friendly fire)
+        {
+            bool hit = false;
+            for (int pi = 0; pi < MAX_PLAYERS; pi++) {
+                if (!playerActive[pi] || !players[pi].alive) continue;
+                if (players[pi].invuln > 0) continue;
+                if (b.owner == pi) continue;  // can't hit yourself
+                Tank& p = players[pi];
+                if (rectCollide(b.x - 3, b.y - 3, 6, p.x - 14, p.y - 14, 28)) {
+                    bullets.erase(bullets.begin() + i);
+                    spawnExplosion(p.x, p.y, p.color, 20);
+                    screenShake = 12;
+                    p.lives--;
+                    if (p.lives <= 0) {
+                        p.alive = false;
+                        // Check if ALL active players are out of lives
+                        bool allDead = true;
+                        for (int j = 0; j < MAX_PLAYERS; j++) {
+                            if (playerActive[j] && players[j].lives > 0) {
+                                allDead = false;
+                                break;
+                            }
+                        }
+                        if (allDead) {
+                            state = GameState::GAMEOVER;
+                        }
+                    } else {
+                        // Respawn at their spawn point
+                        if (pi == 0) {
+                            p.x = 1.5f * TILE;
+                            p.y = (ROWS - 2.5f) * TILE;
+                        } else {
+                            p.x = (COLS - 2.5f) * TILE;
+                            p.y = (ROWS - 2.5f) * TILE;
+                        }
+                        p.dir = 0;
+                        p.invuln = 90;
+                    }
+                    hit = true;
+                    break;
                 }
-                continue;
             }
+            if (hit) continue;
         }
     }
 
@@ -321,10 +416,20 @@ void GameEngine::tick(const InputState& input) {
         enemiesLeft = 3 + wave * 2;
         spawnTimer = 0;
         generateWalls();
-        player.x = 1.5f * TILE;
-        player.y = (ROWS - 2.5f) * TILE;
-        player.dir = 0;
-        player.invuln = 90;
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            if (!playerActive[i]) continue;
+            Tank& p = players[i];
+            if (i == 0) {
+                p.x = 1.5f * TILE;
+                p.y = (ROWS - 2.5f) * TILE;
+            } else {
+                p.x = (COLS - 2.5f) * TILE;
+                p.y = (ROWS - 2.5f) * TILE;
+            }
+            p.dir = 0;
+            p.invuln = 90;
+            if (p.lives > 0) p.alive = true;
+        }
         enemies.clear();
         bullets.clear();
     }
@@ -353,8 +458,6 @@ void GameEngine::tick(const InputState& input) {
         std::remove_if(enemies.begin(), enemies.end(), [](const Tank& t) { return !t.alive && true; }),
         enemies.end()
     );
-    // Actually keep dead ones briefly for rendering the explosion, remove after a delay
-    // Simplified: just keep alive ones. Dead ones already spawned particles.
 }
 
 // ── JSON serialization ──────────────────────────────
@@ -383,15 +486,26 @@ std::string GameEngine::serializeState() const {
     }
 
     o << "{\"type\":\"state\",\"gameState\":\"" << stateStr << "\","
-      << "\"score\":" << score << ",\"lives\":" << lives << ",\"wave\":" << wave
+      << "\"score\":" << score << ",\"wave\":" << wave
       << ",\"enemiesLeft\":" << enemiesLeft << ",\"screenShake\":" << screenShake
       << ",\"frameCount\":" << frameCount << ",\"hardmode\":" << (hardmode ? "true" : "false");
 
-    // Player
-    o << ",\"player\":{\"x\":" << player.x << ",\"y\":" << player.y
-      << ",\"dir\":" << player.dir << ",\"alive\":" << (player.alive ? "true" : "false")
-      << ",\"invuln\":" << player.invuln << ",\"hp\":" << player.hp
-      << ",\"color\":\"" << escStr(player.color) << "\"}";
+    // Players
+    o << ",\"players\":[";
+    bool firstPlayer = true;
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        if (!playerActive[i]) continue;
+        if (!firstPlayer) o << ",";
+        firstPlayer = false;
+        const Tank& p = players[i];
+        o << "{\"id\":" << p.id
+          << ",\"x\":" << p.x << ",\"y\":" << p.y
+          << ",\"dir\":" << p.dir << ",\"alive\":" << (p.alive ? "true" : "false")
+          << ",\"invuln\":" << p.invuln << ",\"hp\":" << p.hp
+          << ",\"lives\":" << p.lives
+          << ",\"color\":\"" << escStr(p.color) << "\"}";
+    }
+    o << "]";
 
     // Walls
     o << ",\"walls\":[";
@@ -426,7 +540,7 @@ std::string GameEngine::serializeState() const {
         first = false;
         o << "{\"x\":" << b.x << ",\"y\":" << b.y
           << ",\"vx\":" << b.vx << ",\"vy\":" << b.vy
-          << ",\"isEnemy\":" << (b.isEnemy ? "true" : "false") << "}";
+          << ",\"owner\":" << b.owner << "}";
     }
     o << "]";
 

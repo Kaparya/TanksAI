@@ -224,11 +224,11 @@ canvas#c { display: block; border-radius: 2px; }
 
 .go-title {
   font-family: 'Orbitron', sans-serif;
-  font-size: 56px; font-weight: 900;
+  font-size: 48px; font-weight: 900;
   letter-spacing: 8px;
   color: var(--clr-accent2);
-  text-shadow: var(--glow-red);
-  margin-bottom: 20px;
+  text-shadow: 0 0 15px rgba(255,61,113,.3), 0 0 40px rgba(255,61,113,.1);
+  margin-bottom: 36px;
   animation: goFlicker 2s ease-in-out infinite;
 }
 
@@ -242,11 +242,11 @@ canvas#c { display: block; border-radius: 2px; }
 .go-stat .label {
   font-size: 11px; text-transform: uppercase;
   letter-spacing: 3px; color: var(--clr-text-dim);
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 .go-stat .value {
   font-family: 'Orbitron', sans-serif;
-  font-size: 32px; font-weight: 700;
+  font-size: 28px; font-weight: 700;
   color: var(--clr-gold);
 }
 .go-stat .value.wave-val { color: var(--clr-accent); }

@@ -71,6 +71,12 @@ const App = (() => {
   }
 
   function handleState(state) {
+    // Auto-join if game is already running (player 2 joining mid-game)
+    if (state.gameState === 'playing' && currentState === 'menu') {
+      UI.showGame();
+      currentState = 'playing';
+    }
+
     // Update HUD
     if (state.gameState === 'playing' || state.gameState === 'paused') {
       UI.updateHUD(state);

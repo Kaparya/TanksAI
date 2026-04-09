@@ -1,6 +1,6 @@
 # TANKS — Battle Arena
 
-A browser-based tank battle game powered by a C++ backend.
+A browser-based tank battle game powered by a C++ backend with 2-player co-op multiplayer.
 
 The C++ server runs all game logic (movement, collision, AI, waves, particles) at 60 FPS and streams state to the browser over WebSocket. The client handles rendering and input only — zero game logic in the browser.
 
@@ -36,6 +36,24 @@ You can pass a custom base port as an argument:
 ```bash
 ./build/tanks_server 8080    # HTTP on 8080, WebSocket on 8081
 ```
+
+## Multiplayer
+
+The game supports up to **2 players** in co-op mode:
+
+- **1 player** — open one browser tab, play solo against bots (classic mode)
+- **2 players** — open a second tab (or another browser), the second player automatically joins the game
+
+### How it works
+
+- Player 1 (green) spawns bottom-left, Player 2 (cyan) spawns bottom-right
+- Both players fight enemy waves together on the same field
+- **Friendly fire** is enabled — players can shoot each other
+- Each player has their own lives (3 normal, 1 in hardmode)
+- Shared score across both players
+- Game over when all players are out of lives
+- Player 2 can join or leave mid-game; the remaining player continues solo
+- A third connection is rejected (max 2 players)
 
 ## How to Play
 
@@ -86,6 +104,8 @@ tanks/
 │   │   ├── network.js            # WebSocket client
 │   │   └── ui.js                 # Menu, HUD, overlays
 │   └── favicon.svg
+├── tests/
+│   └── test_multiplayer.py       # WebSocket protocol tests
 └── scripts/
     └── run.sh                    # Build + run convenience script
 ```
@@ -103,6 +123,8 @@ tanks/
 ```
 
 - **Client → Server**: `{"type":"input","keys":{"up":true,...,"shoot":false}}`
-- **Server → Client**: full game state every frame (player, enemies, bullets, walls, particles, score, wave)
+- **Server → Client**: full game state every frame (players, enemies, bullets, walls, particles, score, wave)
+- **On connect**: server assigns player ID via `{"type":"welcome","playerId":0}`
+- **Server full**: `{"type":"full"}` sent to third+ connections
 
 No external dependencies — the WebSocket handshake (SHA-1 + Base64) is implemented from scratch.

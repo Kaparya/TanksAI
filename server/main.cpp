@@ -6,6 +6,7 @@
 #include <chrono>
 #include <thread>
 #include <string>
+#include <map>
 #include <signal.h>
 #include <unistd.h>
 #include <libgen.h>
@@ -94,7 +95,8 @@ int main(int argc, char* argv[]) {
     // WebSocket server (uses fds handed off from HTTP server)
     WebSocketServer ws;
     GameEngine game;
-    InputState currentInput;
+    InputState currentInputs[GameEngine::MAX_PLAYERS];
+    std::map<int, int> fdToPlayerId;
 
     // When HTTP detects a WS upgrade, hand the fd to the WS server
     http.setOnUpgrade([](int /*fd*/, const std::string& /*data*/) {
@@ -108,15 +110,31 @@ int main(int argc, char* argv[]) {
     }
     printf("WebSocket on ws://localhost:%d\n", port + 1);
 
-    ws.setOnConnect([](int fd) {
-        printf("[WS] Client connected: %d\n", fd);
+    ws.setOnConnect([&](int fd) {
+        int playerId = game.addPlayer();
+        if (playerId < 0) {
+            ws.send(fd, "{\"type\":\"full\"}");
+            printf("[WS] Client %d rejected — server full\n", fd);
+            return;
+        }
+        fdToPlayerId[fd] = playerId;
+        std::string welcome = "{\"type\":\"welcome\",\"playerId\":" + std::to_string(playerId) + "}";
+        ws.send(fd, welcome);
+        printf("[WS] Client %d connected as player %d\n", fd, playerId);
     });
 
-    ws.setOnDisconnect([](int fd) {
-        printf("[WS] Client disconnected: %d\n", fd);
+    ws.setOnDisconnect([&](int fd) {
+        auto it = fdToPlayerId.find(fd);
+        if (it != fdToPlayerId.end()) {
+            int playerId = it->second;
+            game.removePlayer(playerId);
+            std::memset(&currentInputs[playerId], 0, sizeof(InputState));
+            fdToPlayerId.erase(it);
+            printf("[WS] Client %d (player %d) disconnected\n", fd, playerId);
+        }
     });
 
-    ws.setOnMessage([&](int /*fd*/, const std::string& msg) {
+    ws.setOnMessage([&](int fd, const std::string& msg) {
         std::string type = jsonGetString(msg, "type");
 
         if (type == "start") {
@@ -132,15 +150,17 @@ int main(int argc, char* argv[]) {
         } else if (type == "quit") {
             game.quit();
         } else if (type == "input") {
-            // Parse keys object
+            auto it = fdToPlayerId.find(fd);
+            if (it == fdToPlayerId.end()) return;
+            int playerId = it->second;
             auto keysPos = msg.find("\"keys\"");
             if (keysPos != std::string::npos) {
                 std::string keysStr = msg.substr(keysPos);
-                currentInput.up    = jsonGetBool(keysStr, "up");
-                currentInput.down  = jsonGetBool(keysStr, "down");
-                currentInput.left  = jsonGetBool(keysStr, "left");
-                currentInput.right = jsonGetBool(keysStr, "right");
-                currentInput.shoot = jsonGetBool(keysStr, "shoot");
+                currentInputs[playerId].up    = jsonGetBool(keysStr, "up");
+                currentInputs[playerId].down  = jsonGetBool(keysStr, "down");
+                currentInputs[playerId].left  = jsonGetBool(keysStr, "left");
+                currentInputs[playerId].right = jsonGetBool(keysStr, "right");
+                currentInputs[playerId].shoot = jsonGetBool(keysStr, "shoot");
             }
         }
     });
@@ -160,7 +180,7 @@ int main(int argc, char* argv[]) {
             ws.poll(0);
 
             // Game tick
-            game.tick(currentInput);
+            game.tick(currentInputs);
 
             // Send state to all clients
             if (ws.hasClients()) {
