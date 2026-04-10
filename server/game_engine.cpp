@@ -444,11 +444,9 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
             }
             p.dir = 0;
             p.invuln = 90;
-            if (p.lives == 0) {
-                p.alive = true;
-                int maxLives = hardmode ? 1 : 3;
-                if (p.lives < maxLives) p.lives++;
-            }
+            p.alive = true;
+            int maxLives = hardmode ? 1 : 3;
+            if (p.lives < maxLives) p.lives++;
         }
         enemies.clear();
         bullets.clear();
