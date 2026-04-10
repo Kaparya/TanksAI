@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake
+
+      - name: Build server
+        run: |
+          mkdir -p build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: pip install -r requirements.txt
+
+      - name: Start server
+        run: |
+          ./build/tanks_server &
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
+
+          # Wait for WebSocket port 9001 to be ready
+          for i in $(seq 1 30); do
+            if nc -z localhost 9001 2>/dev/null; then
+              echo "Server ready on port 9001"
+              break
+            fi
+            sleep 0.5
+          done
+
+      - name: Run tests
+        working-directory: tests
+        run: python run_tests.py
+
+      - name: Stop server
+        if: always()
+        run: kill $SERVER_PID 2>/dev/null || true
