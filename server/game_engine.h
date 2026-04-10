@@ -40,6 +40,7 @@ struct Bullet {
     float x, y;
     float vx, vy;
     int owner; // -1 = enemy, 0 = player 0, 1 = player 1
+    bool dead = false;
 };
 
 struct Particle {
@@ -81,6 +82,10 @@ public:
     int screenShake = 0;
     int frameCount = 0;
     GameState state = GameState::MENU;
+
+    // Cached walls JSON (rebuilt only when walls change)
+    mutable std::string wallsJson_;
+    mutable bool wallsDirty_ = true;
 
     GameEngine();
     void start(bool hard);

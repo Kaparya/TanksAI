@@ -14,6 +14,7 @@ float GameEngine::randf() const {
 // ── Map generation ──────────────────────────────────
 
 void GameEngine::generateWalls() {
+    wallsDirty_ = true;
     std::memset(walls, 0, sizeof(walls));
     // Steel border
     for (int x = 0; x < COLS; x++) { walls[0][x] = 2; walls[ROWS-1][x] = 2; }
@@ -316,52 +317,48 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
         updateEnemyAI(e);
     }
 
-    // Bullets
-    for (int i = static_cast<int>(bullets.size()) - 1; i >= 0; i--) {
+    // Bullets — mark dead instead of erasing mid-loop
+    for (size_t i = 0; i < bullets.size(); i++) {
         auto& b = bullets[i];
+        if (b.dead) continue;
         b.x += b.vx;
         b.y += b.vy;
 
         int gx = static_cast<int>(b.x) / TILE;
         int gy = static_cast<int>(b.y) / TILE;
         if (gx < 0 || gx >= COLS || gy < 0 || gy >= ROWS) {
-            bullets.erase(bullets.begin() + i); continue;
+            b.dead = true; continue;
         }
         if (walls[gy][gx] > 0) {
             if (walls[gy][gx] == 1) {
                 walls[gy][gx] = 0;
+                wallsDirty_ = true;
                 spawnExplosion(gx * TILE + TILE / 2.0f, gy * TILE + TILE / 2.0f, "#a54", 8);
                 screenShake = 4;
             } else {
                 spawnExplosion(b.x, b.y, "#99a", 4);
             }
-            bullets.erase(bullets.begin() + i); continue;
+            b.dead = true; continue;
         }
 
         // Bullet deflection: player bullets destroy enemy bullets on contact
         if (b.owner >= 0) {
-            bool deflected = false;
-            for (int j = static_cast<int>(bullets.size()) - 1; j >= 0; j--) {
+            for (size_t j = 0; j < bullets.size(); j++) {
                 if (j == i) continue;
                 auto& other = bullets[j];
-                if (other.owner >= 0) continue;  // only deflect enemy bullets
+                if (other.dead || other.owner >= 0) continue;
                 if (rectCollide(b.x - 3, b.y - 3, 6, other.x - 3, other.y - 3, 6)) {
                     spawnExplosion((b.x + other.x) / 2, (b.y + other.y) / 2, "#fff", 10);
-                    // Remove both bullets (higher index first to keep indices valid)
-                    int hi = std::max(i, j), lo = std::min(i, j);
-                    bullets.erase(bullets.begin() + hi);
-                    bullets.erase(bullets.begin() + lo);
-                    i = lo - 1;  // adjust loop index
-                    deflected = true;
+                    b.dead = true;
+                    other.dead = true;
                     break;
                 }
             }
-            if (deflected) continue;
+            if (b.dead) continue;
         }
 
         // Player bullet hits enemy
         if (b.owner >= 0) {
-            bool hit = false;
             for (auto& e : enemies) {
                 if (!e.alive) continue;
                 if (rectCollide(b.x - 3, b.y - 3, 6, e.x - 14, e.y - 14, 28)) {
@@ -375,58 +372,56 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
                     } else {
                         spawnExplosion(b.x, b.y, "#fff", 4);
                     }
-                    bullets.erase(bullets.begin() + i);
-                    hit = true; break;
-                }
-            }
-            if (hit) continue;
-        }
-
-        // Bullet hits player (enemy bullets or friendly fire)
-        {
-            bool hit = false;
-            for (int pi = 0; pi < MAX_PLAYERS; pi++) {
-                if (!playerActive[pi] || !players[pi].alive) continue;
-                if (players[pi].invuln > 0) continue;
-                if (b.owner == pi) continue;  // can't hit yourself
-                Tank& p = players[pi];
-                if (rectCollide(b.x - 3, b.y - 3, 6, p.x - 14, p.y - 14, 28)) {
-                    bullets.erase(bullets.begin() + i);
-                    spawnExplosion(p.x, p.y, p.color, 20);
-                    screenShake = 12;
-                    p.lives--;
-                    if (p.lives <= 0) {
-                        p.alive = false;
-                        // Check if ALL active players are out of lives
-                        bool allDead = true;
-                        for (int j = 0; j < MAX_PLAYERS; j++) {
-                            if (playerActive[j] && players[j].lives > 0) {
-                                allDead = false;
-                                break;
-                            }
-                        }
-                        if (allDead) {
-                            state = GameState::GAMEOVER;
-                        }
-                    } else {
-                        // Respawn at their spawn point
-                        if (pi == 0) {
-                            p.x = 1.5f * TILE;
-                            p.y = (ROWS - 2.5f) * TILE;
-                        } else {
-                            p.x = (COLS - 2.5f) * TILE;
-                            p.y = (ROWS - 2.5f) * TILE;
-                        }
-                        p.dir = 0;
-                        p.invuln = 90;
-                    }
-                    hit = true;
+                    b.dead = true;
                     break;
                 }
             }
-            if (hit) continue;
+            if (b.dead) continue;
+        }
+
+        // Bullet hits player (enemy bullets or friendly fire)
+        for (int pi = 0; pi < MAX_PLAYERS; pi++) {
+            if (!playerActive[pi] || !players[pi].alive) continue;
+            if (players[pi].invuln > 0) continue;
+            if (b.owner == pi) continue;
+            Tank& p = players[pi];
+            if (rectCollide(b.x - 3, b.y - 3, 6, p.x - 14, p.y - 14, 28)) {
+                b.dead = true;
+                spawnExplosion(p.x, p.y, p.color, 20);
+                screenShake = 12;
+                p.lives--;
+                if (p.lives <= 0) {
+                    p.alive = false;
+                    bool allDead = true;
+                    for (int j = 0; j < MAX_PLAYERS; j++) {
+                        if (playerActive[j] && players[j].lives > 0) {
+                            allDead = false;
+                            break;
+                        }
+                    }
+                    if (allDead) {
+                        state = GameState::GAMEOVER;
+                    }
+                } else {
+                    if (pi == 0) {
+                        p.x = 1.5f * TILE;
+                        p.y = (ROWS - 2.5f) * TILE;
+                    } else {
+                        p.x = (COLS - 2.5f) * TILE;
+                        p.y = (ROWS - 2.5f) * TILE;
+                    }
+                    p.dir = 0;
+                    p.invuln = 90;
+                }
+                break;
+            }
         }
     }
+    // Remove dead bullets in one pass
+    bullets.erase(
+        std::remove_if(bullets.begin(), bullets.end(), [](const Bullet& b) { return b.dead; }),
+        bullets.end()
+    );
 
     // Spawn enemies / next wave
     int aliveEnemies = 0;
@@ -449,7 +444,7 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
             }
             p.dir = 0;
             p.invuln = 90;
-            if (p.lives > 0) {
+            if (p.lives == 0) {
                 p.alive = true;
                 int maxLives = hardmode ? 1 : 3;
                 if (p.lives < maxLives) p.lives++;
@@ -470,13 +465,15 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
     }
 
     // Particles
-    for (int i = static_cast<int>(particles.size()) - 1; i >= 0; i--) {
-        auto& p = particles[i];
+    for (auto& p : particles) {
         p.x += p.vx; p.y += p.vy;
         p.vx *= 0.95f; p.vy *= 0.95f;
         p.life--;
-        if (p.life <= 0) particles.erase(particles.begin() + i);
     }
+    particles.erase(
+        std::remove_if(particles.begin(), particles.end(), [](const Particle& p) { return p.life <= 0; }),
+        particles.end()
+    );
 
     // Clean dead enemies
     enemies.erase(
@@ -497,10 +494,39 @@ static std::string escStr(const std::string& s) {
     return out;
 }
 
+// Fast float-to-string with 2 decimal places (avoids ostringstream overhead)
+static void appendFloat(std::string& s, float v) {
+    char buf[32];
+    int n = snprintf(buf, sizeof(buf), "%.2f", v);
+    s.append(buf, n);
+}
+
+static void appendInt(std::string& s, int v) {
+    char buf[16];
+    int n = snprintf(buf, sizeof(buf), "%d", v);
+    s.append(buf, n);
+}
+
 std::string GameEngine::serializeState() const {
-    std::ostringstream o;
-    o.precision(2);
-    o << std::fixed;
+    // Rebuild walls cache only when walls change
+    if (wallsDirty_) {
+        wallsJson_.clear();
+        wallsJson_ += "[";
+        for (int y = 0; y < ROWS; y++) {
+            if (y > 0) wallsJson_ += ",";
+            wallsJson_ += "[";
+            for (int x = 0; x < COLS; x++) {
+                if (x > 0) wallsJson_ += ",";
+                appendInt(wallsJson_, walls[y][x]);
+            }
+            wallsJson_ += "]";
+        }
+        wallsJson_ += "]";
+        wallsDirty_ = false;
+    }
+
+    std::string o;
+    o.reserve(2048 + wallsJson_.size());
 
     const char* stateStr = "menu";
     switch (state) {
@@ -510,78 +536,87 @@ std::string GameEngine::serializeState() const {
         default: break;
     }
 
-    o << "{\"type\":\"state\",\"gameState\":\"" << stateStr << "\","
-      << "\"score\":" << score << ",\"wave\":" << wave
-      << ",\"enemiesLeft\":" << enemiesLeft << ",\"screenShake\":" << screenShake
-      << ",\"frameCount\":" << frameCount << ",\"hardmode\":" << (hardmode ? "true" : "false");
+    o += "{\"type\":\"state\",\"gameState\":\"";
+    o += stateStr;
+    o += "\",\"score\":"; appendInt(o, score);
+    o += ",\"wave\":"; appendInt(o, wave);
+    o += ",\"enemiesLeft\":"; appendInt(o, enemiesLeft);
+    o += ",\"screenShake\":"; appendInt(o, screenShake);
+    o += ",\"frameCount\":"; appendInt(o, frameCount);
+    o += ",\"hardmode\":"; o += (hardmode ? "true" : "false");
 
     // Players
-    o << ",\"players\":[";
+    o += ",\"players\":[";
     bool firstPlayer = true;
     for (int i = 0; i < MAX_PLAYERS; i++) {
         if (!playerActive[i]) continue;
-        if (!firstPlayer) o << ",";
+        if (!firstPlayer) o += ",";
         firstPlayer = false;
         const Tank& p = players[i];
-        o << "{\"id\":" << p.id
-          << ",\"x\":" << p.x << ",\"y\":" << p.y
-          << ",\"dir\":" << p.dir << ",\"alive\":" << (p.alive ? "true" : "false")
-          << ",\"invuln\":" << p.invuln << ",\"hp\":" << p.hp
-          << ",\"lives\":" << p.lives
-          << ",\"color\":\"" << escStr(p.color) << "\"}";
+        o += "{\"id\":"; appendInt(o, p.id);
+        o += ",\"x\":"; appendFloat(o, p.x);
+        o += ",\"y\":"; appendFloat(o, p.y);
+        o += ",\"dir\":"; appendInt(o, p.dir);
+        o += ",\"alive\":"; o += (p.alive ? "true" : "false");
+        o += ",\"invuln\":"; appendInt(o, p.invuln);
+        o += ",\"hp\":"; appendInt(o, p.hp);
+        o += ",\"lives\":"; appendInt(o, p.lives);
+        o += ",\"color\":\""; o += escStr(p.color); o += "\"}";
     }
-    o << "]";
+    o += "]";
 
-    // Walls
-    o << ",\"walls\":[";
-    for (int y = 0; y < ROWS; y++) {
-        if (y > 0) o << ",";
-        o << "[";
-        for (int x = 0; x < COLS; x++) {
-            if (x > 0) o << ",";
-            o << walls[y][x];
-        }
-        o << "]";
-    }
-    o << "]";
+    // Walls (cached)
+    o += ",\"walls\":";
+    o += wallsJson_;
 
     // Enemies
-    o << ",\"enemies\":[";
+    o += ",\"enemies\":[";
     bool first = true;
     for (const auto& e : enemies) {
-        if (!first) o << ",";
+        if (!first) o += ",";
         first = false;
-        o << "{\"x\":" << e.x << ",\"y\":" << e.y << ",\"dir\":" << e.dir
-          << ",\"color\":\"" << escStr(e.color) << "\",\"alive\":" << (e.alive ? "true" : "false")
-          << ",\"hp\":" << e.hp << ",\"maxHp\":" << e.maxHp << ",\"flash\":" << e.flash << "}";
+        o += "{\"x\":"; appendFloat(o, e.x);
+        o += ",\"y\":"; appendFloat(o, e.y);
+        o += ",\"dir\":"; appendInt(o, e.dir);
+        o += ",\"color\":\""; o += escStr(e.color); o += "\"";
+        o += ",\"alive\":"; o += (e.alive ? "true" : "false");
+        o += ",\"hp\":"; appendInt(o, e.hp);
+        o += ",\"maxHp\":"; appendInt(o, e.maxHp);
+        o += ",\"flash\":"; appendInt(o, e.flash); o += "}";
     }
-    o << "]";
+    o += "]";
 
     // Bullets
-    o << ",\"bullets\":[";
+    o += ",\"bullets\":[";
     first = true;
     for (const auto& b : bullets) {
-        if (!first) o << ",";
+        if (!first) o += ",";
         first = false;
-        o << "{\"x\":" << b.x << ",\"y\":" << b.y
-          << ",\"vx\":" << b.vx << ",\"vy\":" << b.vy
-          << ",\"owner\":" << b.owner << "}";
+        o += "{\"x\":"; appendFloat(o, b.x);
+        o += ",\"y\":"; appendFloat(o, b.y);
+        o += ",\"vx\":"; appendFloat(o, b.vx);
+        o += ",\"vy\":"; appendFloat(o, b.vy);
+        o += ",\"owner\":"; appendInt(o, b.owner); o += "}";
     }
-    o << "]";
+    o += "]";
 
     // Particles
-    o << ",\"particles\":[";
+    o += ",\"particles\":[";
     first = true;
     for (const auto& p : particles) {
-        if (!first) o << ",";
+        if (!first) o += ",";
         first = false;
-        o << "{\"x\":" << p.x << ",\"y\":" << p.y
-          << ",\"vx\":" << p.vx << ",\"vy\":" << p.vy
-          << ",\"life\":" << p.life << ",\"maxLife\":" << p.maxLife
-          << ",\"color\":\"" << escStr(p.color) << "\",\"size\":" << p.size << "}";
+        o += "{\"x\":"; appendFloat(o, p.x);
+        o += ",\"y\":"; appendFloat(o, p.y);
+        o += ",\"vx\":"; appendFloat(o, p.vx);
+        o += ",\"vy\":"; appendFloat(o, p.vy);
+        o += ",\"life\":"; appendInt(o, p.life);
+        o += ",\"maxLife\":"; appendInt(o, p.maxLife);
+        o += ",\"color\":\""; o += escStr(p.color); o += "\"";
+        o += ",\"size\":"; appendFloat(o, p.size); o += "}";
     }
-    o << "]";
+    o += "]";
 
-    o << "}";
-    return o.str();
+    o += "}";
+    return o;
 }
