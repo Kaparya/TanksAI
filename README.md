@@ -8,12 +8,13 @@ The C++ server runs all game logic (movement, collision, AI, waves, particles) a
 
 - **macOS** (tested on Apple Silicon)
 - **CMake** 3.15+
-- **C++17** compiler (Xcode Command Line Tools / AppleClang)
+- **C++17** compiler (Xcode Command Line Tools: `xcode-select --install`)
 
 ## Build & Run
 
+From the project root directory:
+
 ```bash
-cd tanks
 ./scripts/run.sh
 ```
 
@@ -31,7 +32,9 @@ The server starts two listeners:
 - **http://localhost:9000** — static file server (open this in your browser)
 - **ws://localhost:9001** — WebSocket game server
 
-You can pass a custom base port as an argument:
+On startup the server prints `Found client files: <path>`. If you see `WARNING: client/index.html not found`, the browser will show 404 — make sure the `client/` directory is present next to the `build/` directory.
+
+Custom port:
 
 ```bash
 ./build/tanks_server 8080    # HTTP on 8080, WebSocket on 8081

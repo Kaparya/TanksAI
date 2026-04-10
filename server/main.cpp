@@ -10,6 +10,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <libgen.h>
+#include <climits>
 #include <mach-o/dyld.h>
 
 static volatile bool running = true;
@@ -50,22 +51,43 @@ static bool jsonGetBool(const std::string& json, const std::string& key) {
 
 // ── Resolve client/ directory relative to executable ──
 
+static std::string resolvePath(const std::string& path) {
+    char resolved[PATH_MAX];
+    if (realpath(path.c_str(), resolved)) return resolved;
+    return path;
+}
+
 static std::string getClientDir() {
+    struct Candidate { std::string path; const char* desc; };
+    std::vector<Candidate> candidates;
+
     // Try relative to executable first
     char pathBuf[4096];
     uint32_t size = sizeof(pathBuf);
     if (_NSGetExecutablePath(pathBuf, &size) == 0) {
-        char* dir = dirname(pathBuf);
-        // Check if ../client exists (when built in build/)
-        std::string candidate = std::string(dir) + "/../client";
-        if (access((candidate + "/index.html").c_str(), R_OK) == 0) return candidate;
-        // Check if ../../client exists (when built in build/server/)
-        candidate = std::string(dir) + "/../../client";
-        if (access((candidate + "/index.html").c_str(), R_OK) == 0) return candidate;
+        char pathCopy[4096];
+        strncpy(pathCopy, pathBuf, sizeof(pathCopy));
+        char* dir = dirname(pathCopy);
+        candidates.push_back({std::string(dir) + "/../client", "relative to executable (../client)"});
+        candidates.push_back({std::string(dir) + "/../../client", "relative to executable (../../client)"});
     }
-    // Fallback: current directory
-    if (access("client/index.html", R_OK) == 0) return "client";
-    if (access("../client/index.html", R_OK) == 0) return "../client";
+    // Fallback: relative to CWD
+    candidates.push_back({"client", "CWD/client"});
+    candidates.push_back({"../client", "CWD/../client"});
+
+    for (auto& c : candidates) {
+        if (access((c.path + "/index.html").c_str(), R_OK) == 0) {
+            printf("Found client files: %s (%s)\n", resolvePath(c.path).c_str(), c.desc);
+            return c.path;
+        }
+    }
+
+    fprintf(stderr, "\n*** WARNING: client/index.html not found! ***\n");
+    fprintf(stderr, "The browser will show 404. Searched:\n");
+    for (auto& c : candidates) {
+        fprintf(stderr, "  - %s (%s)\n", resolvePath(c.path).c_str(), c.desc);
+    }
+    fprintf(stderr, "Make sure you run the server from the project root directory.\n\n");
     return "client";
 }
 
