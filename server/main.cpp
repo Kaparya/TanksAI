@@ -11,7 +11,9 @@
 #include <unistd.h>
 #include <libgen.h>
 #include <climits>
+#ifdef __APPLE__
 #include <mach-o/dyld.h>
+#endif
 
 static volatile bool running = true;
 static void sigHandler(int) { running = false; }
@@ -63,8 +65,15 @@ static std::string getClientDir() {
 
     // Try relative to executable first
     char pathBuf[4096];
+    bool gotExePath = false;
+#ifdef __APPLE__
     uint32_t size = sizeof(pathBuf);
-    if (_NSGetExecutablePath(pathBuf, &size) == 0) {
+    gotExePath = (_NSGetExecutablePath(pathBuf, &size) == 0);
+#else
+    ssize_t len = readlink("/proc/self/exe", pathBuf, sizeof(pathBuf) - 1);
+    if (len > 0) { pathBuf[len] = '\0'; gotExePath = true; }
+#endif
+    if (gotExePath) {
         char pathCopy[4096];
         strncpy(pathCopy, pathBuf, sizeof(pathCopy));
         char* dir = dirname(pathCopy);

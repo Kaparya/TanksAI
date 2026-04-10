@@ -1,0 +1,2 @@
+- [Testing setup](project_testing_setup.md) — Python asyncio+websockets, tests/ dir, run_tests.py entry point, all test file names
+- [Protocol constants](project_protocol_constants.md) — spawn coords, speeds, wave rules, enemy types, state shape, all extracted from C++ source
