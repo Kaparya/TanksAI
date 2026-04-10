@@ -338,6 +338,27 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
             bullets.erase(bullets.begin() + i); continue;
         }
 
+        // Bullet deflection: player bullets destroy enemy bullets on contact
+        if (b.owner >= 0) {
+            bool deflected = false;
+            for (int j = static_cast<int>(bullets.size()) - 1; j >= 0; j--) {
+                if (j == i) continue;
+                auto& other = bullets[j];
+                if (other.owner >= 0) continue;  // only deflect enemy bullets
+                if (rectCollide(b.x - 3, b.y - 3, 6, other.x - 3, other.y - 3, 6)) {
+                    spawnExplosion((b.x + other.x) / 2, (b.y + other.y) / 2, "#fff", 10);
+                    // Remove both bullets (higher index first to keep indices valid)
+                    int hi = std::max(i, j), lo = std::min(i, j);
+                    bullets.erase(bullets.begin() + hi);
+                    bullets.erase(bullets.begin() + lo);
+                    i = lo - 1;  // adjust loop index
+                    deflected = true;
+                    break;
+                }
+            }
+            if (deflected) continue;
+        }
+
         // Player bullet hits enemy
         if (b.owner >= 0) {
             bool hit = false;
@@ -428,7 +449,11 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
             }
             p.dir = 0;
             p.invuln = 90;
-            if (p.lives > 0) p.alive = true;
+            if (p.lives > 0) {
+                p.alive = true;
+                int maxLives = hardmode ? 1 : 3;
+                if (p.lives < maxLives) p.lives++;
+            }
         }
         enemies.clear();
         bullets.clear();
