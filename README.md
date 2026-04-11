@@ -116,13 +116,13 @@ tanks/
 ## Architecture
 
 ```
-┌──────────┐  WebSocket (JSON)  ┌──────────────┐
+┌───────────┐  WebSocket (JSON) ┌──────────────┐
 │  Browser  │ ◄───────────────► │  C++ Server  │
 │           │   input → state   │              │
 │ renderer  │                   │ game_engine  │
-│ input     │                   │ websocket    │
-│ ui        │                   │ http_server  │
-└──────────┘                    └──────────────┘
+│   input   │                   │  websocket   │
+│    ui     │                   │ http_server  │
+└───────────┘                   └──────────────┘
 ```
 
 - **Client → Server**: `{"type":"input","keys":{"up":true,...,"shoot":false}}`
