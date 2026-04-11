@@ -117,21 +117,21 @@ void WebSocketServer::shutdown() {
 // ── Poll ────────────────────────────────────────────
 
 void WebSocketServer::poll(int timeoutMs) {
-    std::vector<pollfd> fds;
-    fds.push_back({listenFd_, POLLIN, 0});
-    for (auto& c : clients_) fds.push_back({c.fd, POLLIN, 0});
+    // Reuse pollfds_ vector instead of allocating each call
+    pollfds_.clear();
+    pollfds_.push_back({listenFd_, POLLIN, 0});
+    for (auto& c : clients_) pollfds_.push_back({c.fd, POLLIN, 0});
 
-    int ret = ::poll(fds.data(), fds.size(), timeoutMs);
+    int ret = ::poll(pollfds_.data(), pollfds_.size(), timeoutMs);
     if (ret <= 0) return;
 
     // New connection?
-    if (fds[0].revents & POLLIN) acceptNewClient();
+    if (pollfds_[0].revents & POLLIN) acceptNewClient();
 
     // Client data
-    for (size_t i = 1; i < fds.size(); i++) {
-        if (fds[i].revents & (POLLIN | POLLERR | POLLHUP)) {
-            // Find client
-            int fd = fds[i].fd;
+    for (size_t i = 1; i < pollfds_.size(); i++) {
+        if (pollfds_[i].revents & (POLLIN | POLLERR | POLLHUP)) {
+            int fd = pollfds_[i].fd;
             for (auto& c : clients_) {
                 if (c.fd == fd) {
                     handleClientData(c);
@@ -177,10 +177,8 @@ void WebSocketServer::handleClientData(Client& c) {
 // ── WebSocket handshake ─────────────────────────────
 
 void WebSocketServer::doHandshake(Client& c) {
-    // Wait for complete HTTP request
     if (c.recvBuf.find("\r\n\r\n") == std::string::npos) return;
 
-    // Extract Sec-WebSocket-Key
     std::string key;
     std::istringstream stream(c.recvBuf);
     std::string line;
@@ -188,7 +186,6 @@ void WebSocketServer::doHandshake(Client& c) {
         if (line.find("Sec-WebSocket-Key:") != std::string::npos) {
             size_t pos = line.find(':');
             key = line.substr(pos + 1);
-            // Trim
             while (!key.empty() && (key.front() == ' ' || key.front() == '\t')) key.erase(key.begin());
             while (!key.empty() && (key.back() == '\r' || key.back() == '\n' || key.back() == ' ')) key.pop_back();
             break;
@@ -196,7 +193,6 @@ void WebSocketServer::doHandshake(Client& c) {
     }
 
     if (key.empty()) {
-        // Not a WebSocket upgrade — close
         removeClient(c.fd);
         return;
     }
@@ -244,7 +240,6 @@ void WebSocketServer::processWebSocketFrame(Client& c) {
         size_t totalLen = headerLen + maskLen + payloadLen;
         if (c.recvBuf.size() < totalLen) return;
 
-        // Extract mask and payload
         uint8_t mask[4] = {0};
         if (masked) {
             for (int i = 0; i < 4; i++)
@@ -275,26 +270,41 @@ void WebSocketServer::processWebSocketFrame(Client& c) {
     }
 }
 
+// ── Build frame into reusable buffer ────────────────
+
+void WebSocketServer::buildFrame(int opcode, const std::string& payload) {
+    sendBuf_.clear();
+    sendBuf_.push_back(0x80 | (opcode & 0x0F)); // FIN + opcode
+
+    if (payload.size() < 126) {
+        sendBuf_.push_back(static_cast<uint8_t>(payload.size()));
+    } else if (payload.size() < 65536) {
+        sendBuf_.push_back(126);
+        sendBuf_.push_back((payload.size() >> 8) & 0xFF);
+        sendBuf_.push_back(payload.size() & 0xFF);
+    } else {
+        sendBuf_.push_back(127);
+        for (int i = 7; i >= 0; i--)
+            sendBuf_.push_back((payload.size() >> (i * 8)) & 0xFF);
+    }
+
+    sendBuf_.insert(sendBuf_.end(), payload.begin(), payload.end());
+}
+
 // ── Send frame ──────────────────────────────────────
 
 void WebSocketServer::sendFrame(int fd, int opcode, const std::string& payload) {
-    std::vector<uint8_t> frame;
-    frame.push_back(0x80 | (opcode & 0x0F)); // FIN + opcode
-
-    if (payload.size() < 126) {
-        frame.push_back(static_cast<uint8_t>(payload.size()));
-    } else if (payload.size() < 65536) {
-        frame.push_back(126);
-        frame.push_back((payload.size() >> 8) & 0xFF);
-        frame.push_back(payload.size() & 0xFF);
-    } else {
-        frame.push_back(127);
-        for (int i = 7; i >= 0; i--)
-            frame.push_back((payload.size() >> (i * 8)) & 0xFF);
+    buildFrame(opcode, payload);
+    // Handle partial writes and EAGAIN
+    size_t sent = 0;
+    while (sent < sendBuf_.size()) {
+        ssize_t n = ::send(fd, sendBuf_.data() + sent, sendBuf_.size() - sent, MSG_NOSIGNAL);
+        if (n < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) break; // drop remainder for this frame
+            break; // real error
+        }
+        sent += n;
     }
-
-    frame.insert(frame.end(), payload.begin(), payload.end());
-    ::send(fd, frame.data(), frame.size(), MSG_NOSIGNAL);
 }
 
 void WebSocketServer::send(int clientFd, const std::string& data) {
@@ -302,8 +312,19 @@ void WebSocketServer::send(int clientFd, const std::string& data) {
 }
 
 void WebSocketServer::broadcast(const std::string& data) {
+    // Build the frame once, send raw bytes to each client
+    buildFrame(0x1, data);
     for (auto& c : clients_) {
-        if (c.wsReady) sendFrame(c.fd, 0x1, data);
+        if (!c.wsReady) continue;
+        size_t sent = 0;
+        while (sent < sendBuf_.size()) {
+            ssize_t n = ::send(c.fd, sendBuf_.data() + sent, sendBuf_.size() - sent, MSG_NOSIGNAL);
+            if (n < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) break;
+                break;
+            }
+            sent += n;
+        }
     }
 }
 

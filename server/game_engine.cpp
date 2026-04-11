@@ -5,6 +5,7 @@
 GameEngine::GameEngine() {
     std::srand(static_cast<unsigned>(std::time(nullptr)));
     std::memset(walls, 0, sizeof(walls));
+    stateJson_.reserve(4096);
 }
 
 float GameEngine::randf() const {
@@ -114,7 +115,7 @@ void GameEngine::start(bool hard) {
     }
     enemies.clear();
     bullets.clear();
-    particles.clear();
+    explosions.clear();
     score = 0;
     wave = 1;
     spawnTimer = 0;
@@ -153,7 +154,6 @@ bool GameEngine::wallAt(float px, float py, float size) const {
 }
 
 bool GameEngine::tankCollide(const Tank* self, float nx, float ny, float size) const {
-    // Check against all players
     for (int i = 0; i < MAX_PLAYERS; i++) {
         if (!playerActive[i]) continue;
         const Tank& p = players[i];
@@ -191,22 +191,10 @@ void GameEngine::shoot(Tank& tank, int owner) {
     bullets.push_back(b);
 }
 
-// ── Particles ───────────────────────────────────────
+// ── Explosions (sent as events to client) ──────────
 
-void GameEngine::spawnExplosion(float x, float y, const std::string& color, int count) {
-    for (int i = 0; i < count; i++) {
-        float angle = randf() * 2.0f * M_PI;
-        float spd = 1.0f + randf() * 3.0f;
-        Particle p;
-        p.x = x; p.y = y;
-        p.vx = std::cos(angle) * spd;
-        p.vy = std::sin(angle) * spd;
-        p.life = 20 + static_cast<int>(randf() * 20);
-        p.maxLife = 40;
-        p.color = color;
-        p.size = 2.0f + randf() * 4.0f;
-        particles.push_back(p);
-    }
+void GameEngine::spawnExplosion(float x, float y, const char* color, int count) {
+    explosions.push_back({x, y, color, count});
 }
 
 // ── Enemy spawning & AI ─────────────────────────────
@@ -251,7 +239,6 @@ bool GameEngine::spawnEnemy() {
 }
 
 void GameEngine::updateEnemyAI(Tank& e) {
-    // Find closest alive player
     float targetX = e.x, targetY = e.y;
     float bestDist = 1e9f;
     for (int i = 0; i < MAX_PLAYERS; i++) {
@@ -293,18 +280,11 @@ void GameEngine::updateEnemyAI(Tank& e) {
 // ── Main tick ───────────────────────────────────────
 
 void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
+    // Clear per-frame explosion events
+    explosions.clear();
+
     if (state == GameState::WAVE_CLEAR) {
         waveClearTimer--;
-        // Still tick particles for visual effect
-        for (auto& p : particles) {
-            p.x += p.vx; p.y += p.vy;
-            p.vx *= 0.95f; p.vy *= 0.95f;
-            p.life--;
-        }
-        particles.erase(
-            std::remove_if(particles.begin(), particles.end(), [](const Particle& p) { return p.life <= 0; }),
-            particles.end()
-        );
         if (waveClearTimer <= 0) {
             advanceWave();
         }
@@ -451,9 +431,8 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
     for (auto& e : enemies) if (e.alive) aliveEnemies++;
 
     if (aliveEnemies == 0 && enemiesLeft == 0) {
-        // Enter wave clear screen
         state = GameState::WAVE_CLEAR;
-        waveClearTimer = 180; // 3 seconds at 60 FPS
+        waveClearTimer = 180;
         enemies.clear();
         bullets.clear();
         return;
@@ -469,20 +448,9 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
         }
     }
 
-    // Particles
-    for (auto& p : particles) {
-        p.x += p.vx; p.y += p.vy;
-        p.vx *= 0.95f; p.vy *= 0.95f;
-        p.life--;
-    }
-    particles.erase(
-        std::remove_if(particles.begin(), particles.end(), [](const Particle& p) { return p.life <= 0; }),
-        particles.end()
-    );
-
     // Clean dead enemies
     enemies.erase(
-        std::remove_if(enemies.begin(), enemies.end(), [](const Tank& t) { return !t.alive && true; }),
+        std::remove_if(enemies.begin(), enemies.end(), [](const Tank& t) { return !t.alive; }),
         enemies.end()
     );
 }
@@ -517,17 +485,7 @@ void GameEngine::advanceWave() {
 
 // ── JSON serialization ──────────────────────────────
 
-static std::string escStr(const std::string& s) {
-    std::string out;
-    for (char c : s) {
-        if (c == '"') out += "\\\"";
-        else if (c == '\\') out += "\\\\";
-        else out += c;
-    }
-    return out;
-}
-
-// Fast float-to-string with 2 decimal places (avoids ostringstream overhead)
+// Fast float-to-string with 2 decimal places
 static void appendFloat(std::string& s, float v) {
     char buf[32];
     int n = snprintf(buf, sizeof(buf), "%.2f", v);
@@ -540,7 +498,7 @@ static void appendInt(std::string& s, int v) {
     s.append(buf, n);
 }
 
-std::string GameEngine::serializeState() const {
+const std::string& GameEngine::serializeState() const {
     // Rebuild walls cache only when walls change
     if (wallsDirty_) {
         wallsJson_.clear();
@@ -556,10 +514,11 @@ std::string GameEngine::serializeState() const {
         }
         wallsJson_ += "]";
         wallsDirty_ = false;
+        wallsVersion_++;
     }
 
-    std::string o;
-    o.reserve(2048 + wallsJson_.size());
+    std::string& o = stateJson_;
+    o.clear();
 
     const char* stateStr = "menu";
     switch (state) {
@@ -579,6 +538,7 @@ std::string GameEngine::serializeState() const {
     o += ",\"frameCount\":"; appendInt(o, frameCount);
     o += ",\"hardmode\":"; o += (hardmode ? "true" : "false");
     o += ",\"waveClearTimer\":"; appendInt(o, waveClearTimer);
+    o += ",\"wallsVersion\":"; appendInt(o, wallsVersion_);
 
     // Players
     o += ",\"players\":[";
@@ -597,11 +557,11 @@ std::string GameEngine::serializeState() const {
         o += ",\"hp\":"; appendInt(o, p.hp);
         o += ",\"lives\":"; appendInt(o, p.lives);
         o += ",\"money\":"; appendInt(o, money[i]);
-        o += ",\"color\":\""; o += escStr(p.color); o += "\"}";
+        o += ",\"color\":\""; o += p.color; o += "\"}";
     }
     o += "]";
 
-    // Walls (cached)
+    // Walls — only send when version changes (client caches)
     o += ",\"walls\":";
     o += wallsJson_;
 
@@ -614,7 +574,7 @@ std::string GameEngine::serializeState() const {
         o += "{\"x\":"; appendFloat(o, e.x);
         o += ",\"y\":"; appendFloat(o, e.y);
         o += ",\"dir\":"; appendInt(o, e.dir);
-        o += ",\"color\":\""; o += escStr(e.color); o += "\"";
+        o += ",\"color\":\""; o += e.color; o += "\"";
         o += ",\"alive\":"; o += (e.alive ? "true" : "false");
         o += ",\"hp\":"; appendInt(o, e.hp);
         o += ",\"maxHp\":"; appendInt(o, e.maxHp);
@@ -636,20 +596,16 @@ std::string GameEngine::serializeState() const {
     }
     o += "]";
 
-    // Particles
-    o += ",\"particles\":[";
+    // Explosions (events for client to spawn particles locally)
+    o += ",\"explosions\":[";
     first = true;
-    for (const auto& p : particles) {
+    for (const auto& ex : explosions) {
         if (!first) o += ",";
         first = false;
-        o += "{\"x\":"; appendFloat(o, p.x);
-        o += ",\"y\":"; appendFloat(o, p.y);
-        o += ",\"vx\":"; appendFloat(o, p.vx);
-        o += ",\"vy\":"; appendFloat(o, p.vy);
-        o += ",\"life\":"; appendInt(o, p.life);
-        o += ",\"maxLife\":"; appendInt(o, p.maxLife);
-        o += ",\"color\":\""; o += escStr(p.color); o += "\"";
-        o += ",\"size\":"; appendFloat(o, p.size); o += "}";
+        o += "{\"x\":"; appendFloat(o, ex.x);
+        o += ",\"y\":"; appendFloat(o, ex.y);
+        o += ",\"color\":\""; o += ex.color; o += "\"";
+        o += ",\"count\":"; appendInt(o, ex.count); o += "}";
     }
     o += "]";
 

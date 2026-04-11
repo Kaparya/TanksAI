@@ -347,10 +347,10 @@ async def test_no_bullets_produced_while_paused():
 
 # ── Test: particles appear on bullet-wall impact ─────────────────────────────
 
-async def test_particles_on_wall_impact():
+async def test_explosions_on_wall_impact():
     """
-    When a bullet hits a wall, the server spawns explosion particles.
-    After firing upward, we should see particles in the state.
+    When a bullet hits a wall, the server sends explosion events.
+    After firing upward, we should see explosions in the state.
     """
     ws1, ws2, _, _, _ = await two_players_playing()
     try:
@@ -361,9 +361,9 @@ async def test_particles_on_wall_impact():
         await send_idle(ws1)
         await asyncio.sleep(0.1)
 
-        state = await drain_until(ws1, lambda s: len(s.get("particles", [])) > 0, max_msgs=60)
-        assert state is not None, "No particles appeared after shooting walls"
-        print(f"  PASS: {len(state['particles'])} particles spawned on bullet impact")
+        state = await drain_until(ws1, lambda s: len(s.get("explosions", [])) > 0, max_msgs=60)
+        assert state is not None, "No explosions appeared after shooting walls"
+        print(f"  PASS: {len(state['explosions'])} explosions on bullet impact")
     finally:
         await cleanup(ws1, ws2)
 
@@ -380,7 +380,7 @@ TESTS = [
     ("player bullet does not destroy steel wall", test_player_bullet_does_not_destroy_steel_wall),
     ("bullets cleared on restart", test_bullets_cleared_on_restart),
     ("no bullets while paused", test_no_bullets_produced_while_paused),
-    ("particles on wall impact", test_particles_on_wall_impact),
+    ("explosions on wall impact", test_explosions_on_wall_impact),
 ]
 
 

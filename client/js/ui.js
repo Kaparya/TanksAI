@@ -111,21 +111,47 @@ const UI = (() => {
     waveClearEl.classList.remove('active');
   }
 
+  // Cache HUD DOM refs and previous values to avoid unnecessary DOM writes
+  const hudScoreEl = document.getElementById('val-score');
+  const hudWaveEl = document.getElementById('val-wave');
+  const hudEnemiesEl = document.getElementById('val-enemies');
+  const hudLivesEl = document.getElementById('val-lives');
+  const hudPlayersEl = document.getElementById('val-players');
+  let prevScore = -1, prevWave = -1, prevEnemies = -1, prevLives = -1, prevPlayerCount = -1;
+
   function updateHUD(state) {
-    document.getElementById('val-score').textContent = state.score;
-    document.getElementById('val-wave').textContent = state.wave;
-    const remaining = state.enemies.filter(e => e.alive).length + state.enemiesLeft;
-    document.getElementById('val-enemies').textContent = remaining;
+    if (state.score !== prevScore) {
+      hudScoreEl.textContent = state.score;
+      prevScore = state.score;
+    }
+    if (state.wave !== prevWave) {
+      hudWaveEl.textContent = state.wave;
+      prevWave = state.wave;
+    }
 
-    // Per-player lives
+    let aliveCount = 0;
+    for (const e of state.enemies) if (e.alive) aliveCount++;
+    const remaining = aliveCount + state.enemiesLeft;
+    if (remaining !== prevEnemies) {
+      hudEnemiesEl.textContent = remaining;
+      prevEnemies = remaining;
+    }
+
     const myId = Network.getMyPlayerId();
-    const me = state.players ? state.players.find(p => p.id === myId) : null;
-    document.getElementById('val-lives').textContent = me ? me.lives : 0;
+    let myLives = 0;
+    if (state.players) {
+      for (const p of state.players) {
+        if (p.id === myId) { myLives = p.lives; break; }
+      }
+    }
+    if (myLives !== prevLives) {
+      hudLivesEl.textContent = myLives;
+      prevLives = myLives;
+    }
 
-    // Players count
-    const playersEl = document.getElementById('val-players');
-    if (playersEl && state.players) {
-      playersEl.textContent = state.players.length;
+    if (state.players && state.players.length !== prevPlayerCount) {
+      hudPlayersEl.textContent = state.players.length;
+      prevPlayerCount = state.players.length;
     }
   }
 

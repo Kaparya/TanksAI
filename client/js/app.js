@@ -125,9 +125,10 @@ const App = (() => {
     if (currentState === 'menu') {
       UI.drawMenuBg();
     }
-    // Send input each frame if playing
-    if (currentState === 'playing' && Network.isConnected()) {
+    // Send input only when keys change
+    if (currentState === 'playing' && Network.isConnected() && Input.isDirty()) {
       Network.sendInput(Input.getState());
+      Input.clearDirty();
     }
     requestAnimationFrame(loop);
   }

@@ -215,8 +215,7 @@ int main(int argc, char* argv[]) {
 
             // Send state to all clients
             if (ws.hasClients()) {
-                std::string state = game.serializeState();
-                ws.broadcast(state);
+                ws.broadcast(game.serializeState());
             }
 
             nextTick += frameTime;

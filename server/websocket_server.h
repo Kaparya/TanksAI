@@ -26,7 +26,7 @@ public:
     // Send text frame to a specific client
     void send(int clientFd, const std::string& data);
 
-    // Send to all connected WS clients
+    // Send to all connected WS clients (builds frame once, sends to all)
     void broadcast(const std::string& data);
 
     // Close
@@ -44,6 +44,8 @@ private:
 
     int listenFd_ = -1;
     std::vector<Client> clients_;
+    std::vector<struct pollfd> pollfds_; // reusable pollfd vector
+    std::vector<uint8_t> sendBuf_;      // reusable frame buffer
 
     MessageCallback onMessage_;
     ConnectCallback onConnect_;
@@ -54,6 +56,7 @@ private:
     void doHandshake(Client& c);
     void processWebSocketFrame(Client& c);
     void sendFrame(int fd, int opcode, const std::string& payload);
+    void buildFrame(int opcode, const std::string& payload);
     void removeClient(int fd);
 
     static std::string computeAcceptKey(const std::string& clientKey);

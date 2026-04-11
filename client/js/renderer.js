@@ -12,12 +12,49 @@ const Renderer = (() => {
   const TILE = 40;
   const COLS = 20, ROWS = 15;
 
-  // Bullet trails (client-side visual only)
-  const bulletTrails = new Map(); // keyed by "x,y" approx
-  let trailId = 0;
+  // Client-side particle system (spawned from server explosion events)
+  const particles = [];
+
+  function spawnExplosion(x, y, color, count) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const spd = 1 + Math.random() * 3;
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd,
+        life: 20 + Math.random() * 20 | 0,
+        maxLife: 40,
+        color,
+        size: 2 + Math.random() * 4
+      });
+    }
+  }
+
+  function tickParticles() {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx; p.y += p.vy;
+      p.vx *= 0.95; p.vy *= 0.95;
+      p.life--;
+      if (p.life <= 0) {
+        particles[i] = particles[particles.length - 1];
+        particles.pop();
+      }
+    }
+  }
 
   function draw(state) {
     if (!state || !state.walls) return;
+
+    // Process explosion events from server
+    if (state.explosions) {
+      for (const ex of state.explosions) {
+        spawnExplosion(ex.x, ex.y, ex.color, ex.count);
+      }
+    }
+
+    tickParticles();
 
     ctx.save();
 
@@ -32,15 +69,17 @@ const Renderer = (() => {
     ctx.fillStyle = '#181c24';
     ctx.fillRect(0, 0, W, H);
 
-    // Grid
+    // Grid — batched into single path
     ctx.strokeStyle = 'rgba(255,255,255,.03)';
     ctx.lineWidth = 1;
+    ctx.beginPath();
     for (let x = 0; x <= W; x += TILE) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+      ctx.moveTo(x, 0); ctx.lineTo(x, H);
     }
     for (let y = 0; y <= H; y += TILE) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      ctx.moveTo(0, y); ctx.lineTo(W, y);
     }
+    ctx.stroke();
 
     drawWalls(state.walls);
     if (state.players) {
@@ -48,7 +87,7 @@ const Renderer = (() => {
     }
     for (const e of state.enemies) drawTank(e, false, state.frameCount);
     drawBullets(state.bullets);
-    drawParticles(state.particles);
+    drawParticles();
     drawWaveAnnouncement(state);
 
     ctx.restore();
@@ -112,12 +151,11 @@ const Renderer = (() => {
     ctx.fillStyle = (tank.flash > 0) ? '#ffffff' : color;
     ctx.fillRect(-12, -12, 24, 24);
 
-    // Body gradient
-    const grad = ctx.createLinearGradient(-12, -12, 12, 12);
-    grad.addColorStop(0, 'rgba(255,255,255,.15)');
-    grad.addColorStop(1, 'rgba(0,0,0,.2)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(-12, -12, 24, 24);
+    // Body highlight
+    ctx.fillStyle = 'rgba(255,255,255,.15)';
+    ctx.fillRect(-12, -12, 24, 12);
+    ctx.fillStyle = 'rgba(0,0,0,.2)';
+    ctx.fillRect(-12, 0, 24, 12);
 
     // Tracks
     ctx.fillStyle = '#1a1a2e';
@@ -138,10 +176,7 @@ const Renderer = (() => {
     ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI * 2); ctx.fill();
 
     // Barrel
-    const barrelGrad = ctx.createLinearGradient(-2.5, -18, 2.5, -4);
-    barrelGrad.addColorStop(0, '#666');
-    barrelGrad.addColorStop(1, '#333');
-    ctx.fillStyle = barrelGrad;
+    ctx.fillStyle = '#555';
     ctx.fillRect(-2.5, -18, 5, 14);
     ctx.fillStyle = '#888';
     ctx.fillRect(-3.5, -19, 7, 3);
@@ -176,30 +211,23 @@ const Renderer = (() => {
     for (const b of bullets) {
       const isEnemy = b.owner < 0;
       const bulletColor = isEnemy ? '#ff5252' : '#ffd740';
-      const glowColor = isEnemy ? 'rgba(255,82,82,.35)' : 'rgba(255,215,64,.35)';
 
       // Bullet body
       ctx.fillStyle = bulletColor;
       ctx.beginPath(); ctx.arc(b.x, b.y, 3.5, 0, Math.PI * 2); ctx.fill();
 
-      // Glow
-      const glowGrad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, 10);
-      glowGrad.addColorStop(0, glowColor);
-      glowGrad.addColorStop(1, 'transparent');
-      ctx.fillStyle = glowGrad;
-      ctx.beginPath(); ctx.arc(b.x, b.y, 10, 0, Math.PI * 2); ctx.fill();
+      // Simple glow (solid circle, no gradient allocation)
+      ctx.globalAlpha = .2;
+      ctx.beginPath(); ctx.arc(b.x, b.y, 8, 0, Math.PI * 2); ctx.fill();
 
       // Simple trail
-      ctx.globalAlpha = .2;
-      ctx.fillStyle = bulletColor;
       ctx.beginPath(); ctx.arc(b.x - b.vx, b.y - b.vy, 2.5, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc(b.x - b.vx * 2, b.y - b.vy * 2, 1.5, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1;
     }
   }
 
-  function drawParticles(particles) {
-    if (!particles) return;
+  function drawParticles() {
     for (const p of particles) {
       ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
       ctx.fillStyle = p.color;

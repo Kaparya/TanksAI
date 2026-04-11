@@ -7,6 +7,8 @@ const Input = (() => {
     up: false, down: false, left: false, right: false, shoot: false
   };
 
+  let dirty = false; // true when keys changed since last getState()
+
   const keyMap = {
     'ArrowUp': 'up', 'KeyW': 'up',
     'ArrowDown': 'down', 'KeyS': 'down',
@@ -21,7 +23,10 @@ const Input = (() => {
     if (preventDefaults.has(e.code)) e.preventDefault();
 
     const action = keyMap[e.code];
-    if (action) keys[action] = true;
+    if (action && !keys[action]) {
+      keys[action] = true;
+      dirty = true;
+    }
 
     // Escape for pause toggle
     if (e.code === 'Escape') {
@@ -31,16 +36,28 @@ const Input = (() => {
 
   window.addEventListener('keyup', (e) => {
     const action = keyMap[e.code];
-    if (action) keys[action] = false;
+    if (action && keys[action]) {
+      keys[action] = false;
+      dirty = true;
+    }
   });
 
   function getState() {
-    return { ...keys };
+    return keys;
+  }
+
+  function isDirty() {
+    return dirty;
+  }
+
+  function clearDirty() {
+    dirty = false;
   }
 
   function reset() {
     keys.up = keys.down = keys.left = keys.right = keys.shoot = false;
+    dirty = true;
   }
 
-  return { getState, reset };
+  return { getState, isDirty, clearDirty, reset };
 })();

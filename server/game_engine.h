@@ -4,7 +4,6 @@
 #include <cstdlib>
 #include <cmath>
 #include <ctime>
-#include <sstream>
 #include <algorithm>
 
 constexpr int TILE = 40;
@@ -19,7 +18,7 @@ static const int DY[] = {-1, 0, 1, 0};
 struct Tank {
     float x = 0, y = 0;
     int dir = 0;           // 0=up,1=right,2=down,3=left
-    std::string color;
+    const char* color = "";
     float speed = 0;
     float bulletSpeed = 0;
     int cooldown = 0;
@@ -43,13 +42,10 @@ struct Bullet {
     bool dead = false;
 };
 
-struct Particle {
+struct Explosion {
     float x, y;
-    float vx, vy;
-    int life;
-    int maxLife;
-    std::string color;
-    float size;
+    const char* color;
+    int count;
 };
 
 struct InputState {
@@ -71,7 +67,7 @@ public:
     bool playerActive[MAX_PLAYERS] = {false, false};
     std::vector<Tank> enemies;
     std::vector<Bullet> bullets;
-    std::vector<Particle> particles;
+    std::vector<Explosion> explosions; // per-tick explosion events for client
 
     // Progress
     int score = 0;
@@ -90,6 +86,10 @@ public:
     // Cached walls JSON (rebuilt only when walls change)
     mutable std::string wallsJson_;
     mutable bool wallsDirty_ = true;
+    mutable int wallsVersion_ = 0;
+
+    // Reusable serialization buffer
+    mutable std::string stateJson_;
 
     GameEngine();
     void start(bool hard);
@@ -98,7 +98,7 @@ public:
     void restart();
     void quit();
     void tick(const InputState inputs[MAX_PLAYERS]);
-    std::string serializeState() const;
+    const std::string& serializeState() const;
 
     int addPlayer();
     void removePlayer(int playerId);
@@ -114,7 +114,7 @@ private:
     void shoot(Tank& tank, int owner);
     bool spawnEnemy();
     void updateEnemyAI(Tank& e);
-    void spawnExplosion(float x, float y, const std::string& color, int count);
+    void spawnExplosion(float x, float y, const char* color, int count);
     void advanceWave();
     float randf() const;
 };
