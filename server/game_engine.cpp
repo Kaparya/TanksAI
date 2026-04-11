@@ -213,13 +213,19 @@ void GameEngine::spawnExplosion(float x, float y, const std::string& color, int 
 
 bool GameEngine::spawnEnemy() {
     struct Spot { float x, y; };
-    Spot spots[] = {
-        {1.5f * TILE, 1.5f * TILE},
-        {(COLS - 2.5f) * TILE, 1.5f * TILE},
-        {(COLS / 2.0f) * TILE, 1.5f * TILE},
-    };
-    auto& spot = spots[std::rand() % 3];
-    if (tankCollide(nullptr, spot.x - 14, spot.y - 14, 28)) return false;
+    Spot spot;
+    while (true) {
+        spot = {
+            (1.5f + randf() * (COLS - 1.5f)) * TILE,
+            (1.5f + randf() * (ROWS - 1.5f)) * TILE
+        };
+        float tlx = spot.x - 14, tly = spot.y - 14;
+        if (!wallAt(tlx, tly, 28)
+                // In 2 tiles from nearest tank
+                && !tankCollide(nullptr, tlx - 2 * TILE, tly - 2 * TILE, 28 + 4 * TILE)) {
+            break;
+        }
+    }
 
     struct EType { const char* color; float speed, bs; int cd, hp; };
     EType types[] = {
@@ -296,15 +302,17 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
     if (state == GameState::WAVE_CLEAR) {
         waveClearTimer--;
         // Still tick particles for visual effect
+        std::vector<Particle> newParticles;
         for (auto& p : particles) {
             p.x += p.vx; p.y += p.vy;
             p.vx *= 0.95f; p.vy *= 0.95f;
             p.life--;
+            if (p.life > 0) {
+                newParticles.push_back(p);
+            }
         }
-        particles.erase(
-            std::remove_if(particles.begin(), particles.end(), [](const Particle& p) { return p.life <= 0; }),
-            particles.end()
-        );
+        particles = std::move(newParticles);
+
         if (waveClearTimer <= 0) {
             advanceWave();
         }
@@ -387,7 +395,7 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
                         e.alive = false;
                         spawnExplosion(e.x, e.y, e.color, 25);
                         screenShake = 8;
-                        int reward = 100 * wave;
+                        int reward = 10 * (wave * 0.5);
                         score += reward;
                         if (b.owner >= 0 && b.owner < MAX_PLAYERS) {
                             money[b.owner] += reward;
@@ -470,19 +478,20 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
     }
 
     // Particles
+    std::vector<Particle> newParticles;
     for (auto& p : particles) {
         p.x += p.vx; p.y += p.vy;
         p.vx *= 0.95f; p.vy *= 0.95f;
         p.life--;
+        if (p.life > 0) {
+            newParticles.push_back(p);
+        }
     }
-    particles.erase(
-        std::remove_if(particles.begin(), particles.end(), [](const Particle& p) { return p.life <= 0; }),
-        particles.end()
-    );
+    particles = std::move(newParticles);
 
     // Clean dead enemies
     enemies.erase(
-        std::remove_if(enemies.begin(), enemies.end(), [](const Tank& t) { return !t.alive && true; }),
+        std::remove_if(enemies.begin(), enemies.end(), [](const Tank& t) { return !t.alive; }),
         enemies.end()
     );
 }

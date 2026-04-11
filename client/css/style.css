@@ -259,6 +259,7 @@ canvas#c { display: block; border-radius: 2px; }
   justify-content: center; align-items: center;
   background: rgba(10,12,16,.88);
   backdrop-filter: blur(6px);
+  line-height: 1.2; 
 }
 #wave-clear.active { display: flex; }
 
