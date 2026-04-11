@@ -154,7 +154,13 @@ void WebSocketServer::acceptNewClient() {
 void WebSocketServer::handleClientData(Client& c) {
     char buf[4096];
     ssize_t n = recv(c.fd, buf, sizeof(buf), 0);
-    if (n <= 0) {
+    if (n < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) return;  // no data yet, not a disconnect
+        if (c.wsReady && onDisconnect_) onDisconnect_(c.fd);
+        removeClient(c.fd);
+        return;
+    }
+    if (n == 0) {  // peer closed connection
         if (c.wsReady && onDisconnect_) onDisconnect_(c.fd);
         removeClient(c.fd);
         return;
