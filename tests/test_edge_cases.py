@@ -287,7 +287,7 @@ async def test_state_schema_invariants():
         # Sample a few state messages and check schema
         required_fields = {
             "type", "gameState", "score", "wave", "enemiesLeft",
-            "screenShake", "frameCount", "hardmode",
+            "screenShake", "frameCount", "hardmode", "waveClearTimer",
             "players", "walls", "enemies", "bullets", "particles"
         }
         samples_checked = 0

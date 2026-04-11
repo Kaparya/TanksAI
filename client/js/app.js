@@ -72,14 +72,24 @@ const App = (() => {
 
   function handleState(state) {
     // Auto-join if game is already running (player 2 joining mid-game)
-    if (state.gameState === 'playing' && currentState === 'menu') {
+    if ((state.gameState === 'playing' || state.gameState === 'wave_clear') && currentState === 'menu') {
       UI.showGame();
-      currentState = 'playing';
+      currentState = state.gameState === 'wave_clear' ? 'wave_clear' : 'playing';
     }
 
     // Update HUD
-    if (state.gameState === 'playing' || state.gameState === 'paused') {
+    if (state.gameState === 'playing' || state.gameState === 'paused' || state.gameState === 'wave_clear') {
       UI.updateHUD(state);
+    }
+
+    // Detect wave clear from server
+    if (state.gameState === 'wave_clear' && currentState !== 'wave_clear') {
+      currentState = 'wave_clear';
+      UI.showWaveClear(state);
+    }
+    if (state.gameState === 'playing' && currentState === 'wave_clear') {
+      currentState = 'playing';
+      UI.hideWaveClear();
     }
 
     // Detect game over from server

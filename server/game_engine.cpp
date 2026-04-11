@@ -119,6 +119,8 @@ void GameEngine::start(bool hard) {
     wave = 1;
     spawnTimer = 0;
     enemiesLeft = 4;
+    waveClearTimer = 0;
+    for (int i = 0; i < MAX_PLAYERS; i++) money[i] = 0;
     screenShake = 0;
     frameCount = 0;
     state = GameState::PLAYING;
@@ -291,6 +293,23 @@ void GameEngine::updateEnemyAI(Tank& e) {
 // ── Main tick ───────────────────────────────────────
 
 void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
+    if (state == GameState::WAVE_CLEAR) {
+        waveClearTimer--;
+        // Still tick particles for visual effect
+        for (auto& p : particles) {
+            p.x += p.vx; p.y += p.vy;
+            p.vx *= 0.95f; p.vy *= 0.95f;
+            p.life--;
+        }
+        particles.erase(
+            std::remove_if(particles.begin(), particles.end(), [](const Particle& p) { return p.life <= 0; }),
+            particles.end()
+        );
+        if (waveClearTimer <= 0) {
+            advanceWave();
+        }
+        return;
+    }
     if (state != GameState::PLAYING) return;
     frameCount++;
 
@@ -368,7 +387,11 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
                         e.alive = false;
                         spawnExplosion(e.x, e.y, e.color, 25);
                         screenShake = 8;
-                        score += 100 * wave;
+                        int reward = 100 * wave;
+                        score += reward;
+                        if (b.owner >= 0 && b.owner < MAX_PLAYERS) {
+                            money[b.owner] += reward;
+                        }
                     } else {
                         spawnExplosion(b.x, b.y, "#fff", 4);
                     }
@@ -428,28 +451,12 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
     for (auto& e : enemies) if (e.alive) aliveEnemies++;
 
     if (aliveEnemies == 0 && enemiesLeft == 0) {
-        wave++;
-        enemiesLeft = 3 + wave * 2;
-        spawnTimer = 0;
-        generateWalls();
-        for (int i = 0; i < MAX_PLAYERS; i++) {
-            if (!playerActive[i]) continue;
-            Tank& p = players[i];
-            if (i == 0) {
-                p.x = 1.5f * TILE;
-                p.y = (ROWS - 2.5f) * TILE;
-            } else {
-                p.x = (COLS - 2.5f) * TILE;
-                p.y = (ROWS - 2.5f) * TILE;
-            }
-            p.dir = 0;
-            p.invuln = 90;
-            p.alive = true;
-            int maxLives = hardmode ? 1 : 3;
-            if (p.lives < maxLives) p.lives++;
-        }
+        // Enter wave clear screen
+        state = GameState::WAVE_CLEAR;
+        waveClearTimer = 180; // 3 seconds at 60 FPS
         enemies.clear();
         bullets.clear();
+        return;
     }
 
     int maxOnScreen = hardmode ? 4 : 3;
@@ -478,6 +485,34 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
         std::remove_if(enemies.begin(), enemies.end(), [](const Tank& t) { return !t.alive && true; }),
         enemies.end()
     );
+}
+
+// ── Wave advance ───────────────────────────────────
+
+void GameEngine::advanceWave() {
+    wave++;
+    enemiesLeft = 3 + wave * 2;
+    spawnTimer = 0;
+    generateWalls();
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        if (!playerActive[i]) continue;
+        Tank& p = players[i];
+        if (i == 0) {
+            p.x = 1.5f * TILE;
+            p.y = (ROWS - 2.5f) * TILE;
+        } else {
+            p.x = (COLS - 2.5f) * TILE;
+            p.y = (ROWS - 2.5f) * TILE;
+        }
+        p.dir = 0;
+        p.invuln = 90;
+        p.alive = true;
+        int maxLives = hardmode ? 1 : 3;
+        if (p.lives < maxLives) p.lives++;
+    }
+    enemies.clear();
+    bullets.clear();
+    state = GameState::PLAYING;
 }
 
 // ── JSON serialization ──────────────────────────────
@@ -530,7 +565,8 @@ std::string GameEngine::serializeState() const {
     switch (state) {
         case GameState::PLAYING:  stateStr = "playing"; break;
         case GameState::PAUSED:   stateStr = "paused"; break;
-        case GameState::GAMEOVER: stateStr = "gameover"; break;
+        case GameState::GAMEOVER:   stateStr = "gameover"; break;
+        case GameState::WAVE_CLEAR: stateStr = "wave_clear"; break;
         default: break;
     }
 
@@ -542,6 +578,7 @@ std::string GameEngine::serializeState() const {
     o += ",\"screenShake\":"; appendInt(o, screenShake);
     o += ",\"frameCount\":"; appendInt(o, frameCount);
     o += ",\"hardmode\":"; o += (hardmode ? "true" : "false");
+    o += ",\"waveClearTimer\":"; appendInt(o, waveClearTimer);
 
     // Players
     o += ",\"players\":[";
@@ -559,6 +596,7 @@ std::string GameEngine::serializeState() const {
         o += ",\"invuln\":"; appendInt(o, p.invuln);
         o += ",\"hp\":"; appendInt(o, p.hp);
         o += ",\"lives\":"; appendInt(o, p.lives);
+        o += ",\"money\":"; appendInt(o, money[i]);
         o += ",\"color\":\""; o += escStr(p.color); o += "\"}";
     }
     o += "]";

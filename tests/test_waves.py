@@ -257,8 +257,9 @@ async def test_score_increases_on_kill():
 
 async def test_wave_advances_after_all_enemies_killed():
     """
-    When all enemies are killed and enemiesLeft==0, wave increments and a new
-    map is generated.  We let both players shoot continuously and wait.
+    When all enemies are killed and enemiesLeft==0, game enters 'wave_clear'
+    state for 3 seconds, then advances to the next wave.
+    We let both players shoot continuously and wait.
     Note: this is a slow test (up to 90 seconds) and is skipped if it times out.
     """
     ws1, ws2, _, _, _ = await two_players_playing()
@@ -272,20 +273,37 @@ async def test_wave_advances_after_all_enemies_killed():
                 except Exception:
                     break
 
-        # Run both shooters concurrently while we poll for wave change
+        # Run both shooters concurrently while we poll for wave_clear
         task1 = asyncio.create_task(spam_shoot(ws1))
         task2 = asyncio.create_task(spam_shoot(ws2))
 
+        # First wait for wave_clear state
+        wc_state = await drain_until(
+            ws1,
+            lambda s: s.get("gameState") == "wave_clear",
+            max_msgs=3000,
+            timeout_per_msg=0.05,
+        )
+
+        if wc_state is None:
+            task1.cancel(); task2.cancel()
+            print("  SKIP: wave_clear did not occur in time (depends on random map/AI)")
+            return
+
+        assert wc_state["gameState"] == "wave_clear"
+        print(f"  wave_clear reached, waveClearTimer={wc_state.get('waveClearTimer', 0)}")
+
+        # Then wait for wave 2 playing state
         state = await drain_until(
             ws1,
-            lambda s: s.get("wave", 1) >= 2,
+            lambda s: s.get("gameState") == "playing" and s.get("wave", 1) >= 2,
             max_msgs=3000,
             timeout_per_msg=0.05,
         )
         task1.cancel(); task2.cancel()
 
         if state is None:
-            print("  SKIP: wave did not advance in time (depends on random map/AI)")
+            print("  SKIP: wave did not advance in time after wave_clear")
             return
 
         assert state["wave"] >= 2
@@ -296,6 +314,93 @@ async def test_wave_advances_after_all_enemies_killed():
         )
         print(f"  PASS: wave advanced to {state['wave']}, "
               f"enemiesLeft={state['enemiesLeft']}")
+    finally:
+        await cleanup(ws1, ws2)
+
+
+# ── Test: money increases on kill ─────────────────────────────────────────────
+
+async def test_money_increases_on_kill():
+    """
+    Killing an enemy awards money (100 * wave) to the killing player.
+    The money field appears on each player object in the state.
+    """
+    ws1, ws2, p1_id, _, _ = await two_players_playing()
+    try:
+        # Shoot continuously — some bullets will hit enemies
+        for _ in range(200):
+            await send_input(ws1, INPUT_KEYS_SHOOT)
+            await asyncio.sleep(0.05)
+
+        state = await drain_until(
+            ws1,
+            lambda s: any(p.get("money", 0) > 0 for p in s.get("players", [])),
+            max_msgs=400,
+            timeout_per_msg=0.1
+        )
+        if state is None:
+            print("  SKIP: couldn't get a kill in reasonable time (random map/positions)")
+            return
+
+        p0 = find_player(state, p1_id)
+        assert p0 is not None
+        assert p0["money"] > 0, f"Expected money > 0, got {p0['money']}"
+        assert p0["money"] % 100 == 0, f"Money {p0['money']} not a multiple of 100*wave"
+        print(f"  PASS: player money after kill: ${p0['money']}")
+    finally:
+        await cleanup(ws1, ws2)
+
+
+# ── Test: money resets on game start ──────────────────────────────────────────
+
+async def test_money_resets_on_start():
+    """Money must be 0 when a new game starts."""
+    ws1, ws2, p1_id, p2_id, state = await two_players_playing()
+    try:
+        for p in state.get("players", []):
+            assert p.get("money", 0) == 0, (
+                f"Player {p['id']} has money={p.get('money')} at game start"
+            )
+        print("  PASS: all players start with $0")
+    finally:
+        await cleanup(ws1, ws2)
+
+
+# ── Test: wave_clear state shows between waves ───────────────────────────────
+
+async def test_wave_clear_state_appears():
+    """
+    After killing all enemies in a wave, the game enters 'wave_clear' state
+    before advancing to the next wave.
+    """
+    ws1, ws2, _, _, _ = await two_players_playing()
+    try:
+        async def spam_shoot(ws):
+            for _ in range(600):
+                try:
+                    await send_input(ws, INPUT_KEYS_SHOOT)
+                    await asyncio.sleep(0.05)
+                except Exception:
+                    break
+
+        task1 = asyncio.create_task(spam_shoot(ws1))
+        task2 = asyncio.create_task(spam_shoot(ws2))
+
+        state = await drain_until(
+            ws1,
+            lambda s: s.get("gameState") == "wave_clear",
+            max_msgs=3000,
+            timeout_per_msg=0.05,
+        )
+        task1.cancel(); task2.cancel()
+
+        if state is None:
+            print("  SKIP: wave_clear did not occur in time")
+            return
+
+        assert state["gameState"] == "wave_clear"
+        assert state.get("waveClearTimer", 0) > 0, "waveClearTimer should be positive"
+        print(f"  PASS: wave_clear state reached, timer={state['waveClearTimer']}")
     finally:
         await cleanup(ws1, ws2)
 
@@ -442,6 +547,9 @@ TESTS = [
     ("wave 1 only spawns basic types", test_wave1_only_spawns_basic_types),
     ("max 3 enemies on screen normal mode", test_max_3_enemies_on_screen_normal_mode),
     ("score increases on kill", test_score_increases_on_kill),
+    ("money increases on kill", test_money_increases_on_kill),
+    ("money resets on start", test_money_resets_on_start),
+    ("wave_clear state appears", test_wave_clear_state_appears),
     ("wave advances after all enemies killed", test_wave_advances_after_all_enemies_killed),
     ("player respawns after hit", test_player_respawns_after_hit),
     ("gameover when all lives lost (hard mode)", test_gameover_when_all_lives_lost),

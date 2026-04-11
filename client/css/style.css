@@ -251,6 +251,81 @@ canvas#c { display: block; border-radius: 2px; }
 }
 .go-stat .value.wave-val { color: var(--clr-accent); }
 
+/* ── Wave Clear ────────────────────────────────── */
+
+#wave-clear {
+  position: absolute; inset: 0; z-index: 85;
+  display: none; flex-direction: column;
+  justify-content: center; align-items: center;
+  background: rgba(10,12,16,.88);
+  backdrop-filter: blur(6px);
+}
+#wave-clear.active { display: flex; }
+
+.wc-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 42px; font-weight: 900;
+  letter-spacing: 8px;
+  color: var(--clr-green);
+  text-shadow: 0 0 20px rgba(0,230,118,.4), 0 0 60px rgba(0,230,118,.15);
+  margin-bottom: 8px;
+  animation: wcPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes wcPulse {
+  0%,100% { text-shadow: 0 0 20px rgba(0,230,118,.4); }
+  50% { text-shadow: 0 0 40px rgba(0,230,118,.6); }
+}
+
+.wc-wave {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 18px; font-weight: 700;
+  color: var(--clr-accent);
+  letter-spacing: 4px;
+  margin-bottom: 36px;
+}
+
+.wc-players {
+  display: flex; gap: 48px;
+  margin-bottom: 32px;
+}
+
+.wc-player-card {
+  text-align: center;
+  padding: 20px 32px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--clr-border);
+  border-radius: 8px;
+  min-width: 160px;
+}
+
+.wc-player-name {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px; font-weight: 700;
+  letter-spacing: 3px; text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+.wc-money-label {
+  font-size: 10px; text-transform: uppercase;
+  letter-spacing: 2px; color: var(--clr-text-dim);
+  margin-bottom: 8px;
+}
+
+.wc-money-value {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 32px; font-weight: 900;
+  color: var(--clr-gold);
+  line-height: 1;
+}
+
+.wc-next {
+  font-size: 13px;
+  color: var(--clr-text-dim);
+  letter-spacing: 2px;
+  animation: blink 1.5s infinite;
+}
+
 /* ── Minimap ───────────────────────────────────── */
 
 #minimap {

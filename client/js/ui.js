@@ -7,6 +7,7 @@ const UI = (() => {
   const hudEl        = document.getElementById('hud');
   const pauseEl      = document.getElementById('pause-overlay');
   const gameoverEl   = document.getElementById('gameover');
+  const waveClearEl  = document.getElementById('wave-clear');
   const minimapEl    = document.getElementById('minimap');
   const connDot      = document.getElementById('conn-dot');
   const connText     = document.getElementById('conn-text');
@@ -58,6 +59,7 @@ const UI = (() => {
     hudEl.classList.remove('active');
     pauseEl.classList.remove('active');
     gameoverEl.classList.remove('active');
+    waveClearEl.classList.remove('active');
     minimapEl.classList.remove('active');
   }
 
@@ -66,6 +68,7 @@ const UI = (() => {
     hudEl.classList.add('active');
     minimapEl.classList.add('active');
     gameoverEl.classList.remove('active');
+    waveClearEl.classList.remove('active');
     pauseEl.classList.remove('active');
   }
 
@@ -85,6 +88,27 @@ const UI = (() => {
 
   function hideGameOver() {
     gameoverEl.classList.remove('active');
+  }
+
+  function showWaveClear(state) {
+    document.getElementById('wc-wave-num').textContent = 'Wave ' + state.wave + ' Complete';
+    const container = document.getElementById('wc-players');
+    container.innerHTML = '';
+    for (const p of (state.players || [])) {
+      const card = document.createElement('div');
+      card.className = 'wc-player-card';
+      const color = p.color || '#fff';
+      card.innerHTML =
+        '<div class="wc-player-name" style="color:' + color + '">Player ' + (p.id + 1) + '</div>' +
+        '<div class="wc-money-label">Total Money</div>' +
+        '<div class="wc-money-value">$' + (p.money || 0) + '</div>';
+      container.appendChild(card);
+    }
+    waveClearEl.classList.add('active');
+  }
+
+  function hideWaveClear() {
+    waveClearEl.classList.remove('active');
   }
 
   function updateHUD(state) {
@@ -126,6 +150,7 @@ const UI = (() => {
     drawMenuBg, showMenu, showGame,
     showPause, hidePause,
     showGameOver, hideGameOver,
+    showWaveClear, hideWaveClear,
     updateHUD, setConnectionStatus, isMenuVisible
   };
 })();

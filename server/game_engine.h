@@ -57,7 +57,7 @@ struct InputState {
     bool shoot = false;
 };
 
-enum class GameState { MENU, PLAYING, PAUSED, GAMEOVER };
+enum class GameState { MENU, PLAYING, PAUSED, GAMEOVER, WAVE_CLEAR };
 
 class GameEngine {
 public:
@@ -82,6 +82,10 @@ public:
     int screenShake = 0;
     int frameCount = 0;
     GameState state = GameState::MENU;
+
+    // Economy
+    int money[MAX_PLAYERS] = {0, 0};
+    int waveClearTimer = 0;
 
     // Cached walls JSON (rebuilt only when walls change)
     mutable std::string wallsJson_;
@@ -111,5 +115,6 @@ private:
     bool spawnEnemy();
     void updateEnemyAI(Tank& e);
     void spawnExplosion(float x, float y, const std::string& color, int count);
+    void advanceWave();
     float randf() const;
 };
