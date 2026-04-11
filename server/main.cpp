@@ -180,6 +180,11 @@ int main(int argc, char* argv[]) {
             game.restart();
         } else if (type == "quit") {
             game.quit();
+        } else if (type == "buy") {
+            auto it = fdToPlayerId.find(fd);
+            if (it == fdToPlayerId.end()) return;
+            std::string upgrade = jsonGetString(msg, "upgrade");
+            game.buyUpgrade(it->second, upgrade);
         } else if (type == "input") {
             auto it = fdToPlayerId.find(fd);
             if (it == fdToPlayerId.end()) return;

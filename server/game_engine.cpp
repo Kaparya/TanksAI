@@ -188,6 +188,8 @@ void GameEngine::shoot(Tank& tank, int owner) {
     b.vx = DX[tank.dir] * tank.bulletSpeed;
     b.vy = DY[tank.dir] * tank.bulletSpeed;
     b.owner = owner;
+    b.damage = tank.bulletDamage;
+    b.radius = static_cast<float>(tank.bulletRadius);
     bullets.push_back(b);
 }
 
@@ -374,7 +376,8 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
                 if (j == i) continue;
                 auto& other = bullets[j];
                 if (other.dead || other.owner >= 0) continue;
-                if (rectCollide(b.x - 3, b.y - 3, 6, other.x - 3, other.y - 3, 6)) {
+                if (rectCollide(b.x - b.radius, b.y - b.radius, b.radius * 2,
+                                other.x - other.radius, other.y - other.radius, other.radius * 2)) {
                     spawnExplosion((b.x + other.x) / 2, (b.y + other.y) / 2, "#fff", 10);
                     b.dead = true;
                     other.dead = true;
@@ -388,8 +391,8 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
         if (b.owner >= 0) {
             for (auto& e : enemies) {
                 if (!e.alive) continue;
-                if (rectCollide(b.x - 3, b.y - 3, 6, e.x - 14, e.y - 14, 28)) {
-                    e.hp--;
+                if (rectCollide(b.x - b.radius, b.y - b.radius, b.radius * 2, e.x - 14, e.y - 14, 28)) {
+                    e.hp -= b.damage;
                     e.flash = 6;
                     if (e.hp <= 0) {
                         e.alive = false;
@@ -416,7 +419,7 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
             if (players[pi].invuln > 0) continue;
             if (b.owner == pi) continue;
             Tank& p = players[pi];
-            if (rectCollide(b.x - 3, b.y - 3, 6, p.x - 14, p.y - 14, 28)) {
+            if (rectCollide(b.x - b.radius, b.y - b.radius, b.radius * 2, p.x - 14, p.y - 14, 28)) {
                 b.dead = true;
                 spawnExplosion(p.x, p.y, p.color, 20);
                 screenShake = 12;
@@ -461,7 +464,7 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
     if (aliveEnemies == 0 && enemiesLeft == 0) {
         // Enter wave clear screen
         state = GameState::WAVE_CLEAR;
-        waveClearTimer = 180; // 3 seconds at 60 FPS
+        waveClearTimer = 360; // 6 seconds at 60 FPS
         enemies.clear();
         bullets.clear();
         return;
@@ -522,6 +525,33 @@ void GameEngine::advanceWave() {
     enemies.clear();
     bullets.clear();
     state = GameState::PLAYING;
+}
+
+// ── Shop ────────────────────────────────────────────
+
+bool GameEngine::buyUpgrade(int playerId, const std::string& upgrade) {
+    if (state != GameState::WAVE_CLEAR) return false;
+    if (playerId < 0 || playerId >= MAX_PLAYERS || !playerActive[playerId]) return false;
+    Tank& p = players[playerId];
+
+    if (upgrade == "damage") {
+        if (p.bulletDmgLevel >= 3) return false;
+        int cost = p.bulletDmgLevel == 1 ? 20 : 50;
+        if (money[playerId] < cost) return false;
+        money[playerId] -= cost;
+        p.bulletDmgLevel++;
+        p.bulletDamage = p.bulletDmgLevel;
+        return true;
+    } else if (upgrade == "size") {
+        if (p.bulletSizeLevel >= 3) return false;
+        int cost = p.bulletSizeLevel == 1 ? 15 : 35;
+        if (money[playerId] < cost) return false;
+        money[playerId] -= cost;
+        p.bulletSizeLevel++;
+        p.bulletRadius = 3 + (p.bulletSizeLevel - 1) * 2; // 3 → 5 → 7
+        return true;
+    }
+    return false;
 }
 
 // ── JSON serialization ──────────────────────────────
@@ -606,6 +636,8 @@ std::string GameEngine::serializeState() const {
         o += ",\"hp\":"; appendInt(o, p.hp);
         o += ",\"lives\":"; appendInt(o, p.lives);
         o += ",\"money\":"; appendInt(o, money[i]);
+        o += ",\"bulletDmgLevel\":"; appendInt(o, p.bulletDmgLevel);
+        o += ",\"bulletSizeLevel\":"; appendInt(o, p.bulletSizeLevel);
         o += ",\"color\":\""; o += escStr(p.color); o += "\"}";
     }
     o += "]";
@@ -641,7 +673,8 @@ std::string GameEngine::serializeState() const {
         o += ",\"y\":"; appendFloat(o, b.y);
         o += ",\"vx\":"; appendFloat(o, b.vx);
         o += ",\"vy\":"; appendFloat(o, b.vy);
-        o += ",\"owner\":"; appendInt(o, b.owner); o += "}";
+        o += ",\"owner\":"; appendInt(o, b.owner);
+        o += ",\"radius\":"; appendFloat(o, b.radius); o += "}";
     }
     o += "]";
 

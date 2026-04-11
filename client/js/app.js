@@ -87,6 +87,9 @@ const App = (() => {
       currentState = 'wave_clear';
       UI.showWaveClear(state);
     }
+    if (state.gameState === 'wave_clear' && currentState === 'wave_clear') {
+      UI.updateWaveClear(state);
+    }
     if (state.gameState === 'playing' && currentState === 'wave_clear') {
       currentState = 'playing';
       UI.hideWaveClear();

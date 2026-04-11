@@ -31,6 +31,11 @@ struct Tank {
     int invuln = 0;        // player only
     int id = -1;           // -1 for enemies, 0 or 1 for players
     int lives = 0;         // per-player lives
+    // Bullet upgrades (players only)
+    int bulletDamage = 1;
+    int bulletRadius = 3;
+    int bulletDmgLevel = 1;
+    int bulletSizeLevel = 1;
     // AI fields (enemies only)
     int aiTimer = 0;
     int aiDir = 2;
@@ -41,6 +46,8 @@ struct Bullet {
     float vx, vy;
     int owner; // -1 = enemy, 0 = player 0, 1 = player 1
     bool dead = false;
+    int damage = 1;
+    float radius = 3.f;
 };
 
 struct Particle {
@@ -103,6 +110,7 @@ public:
     int addPlayer();
     void removePlayer(int playerId);
     int numActivePlayers() const;
+    bool buyUpgrade(int playerId, const std::string& upgrade);
 
 private:
     void generateWalls();

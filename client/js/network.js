@@ -89,6 +89,7 @@ const Network = (() => {
   function sendResume()  { send({ type: 'resume' }); }
   function sendRestart() { send({ type: 'restart' }); }
   function sendQuit()    { send({ type: 'quit' }); }
+  function sendBuy(upgrade) { send({ type: 'buy', upgrade }); }
 
   function onState(cb) { onStateCallback = cb; }
   function isConnected() { return connected; }
@@ -96,7 +97,7 @@ const Network = (() => {
 
   return {
     connect, send, sendInput, sendStart,
-    sendPause, sendResume, sendRestart, sendQuit,
+    sendPause, sendResume, sendRestart, sendQuit, sendBuy,
     onState, isConnected, getMyPlayerId
   };
 })();
