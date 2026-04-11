@@ -120,12 +120,13 @@ const Renderer = (() => {
     ctx.fillRect(-12, -12, 24, 24);
 
     // Tracks
-    ctx.fillStyle = '#1a1a2e';
+    const trackColor = 'rgba(0,180,210,.55)';
+    ctx.fillStyle = trackColor;
     ctx.fillRect(-14, -14, 6, 28);
     ctx.fillRect(8, -14, 6, 28);
 
     // Track detail (animated)
-    ctx.strokeStyle = 'rgba(255,255,255,.12)';
+    ctx.strokeStyle = isPlayer ? 'rgba(0,229,255,.35)' : 'rgba(255,130,80,.35)';
     ctx.lineWidth = 1;
     const trackOffset = (frameCount * (isPlayer ? 2 : 1)) % 4;
     for (let i = -14 + trackOffset; i < 14; i += 4) {
