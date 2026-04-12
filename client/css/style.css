@@ -396,7 +396,8 @@ canvas#c { display: block; border-radius: 2px; }
 }
 
 .wc-buy-btn {
-  display: inline-block; width: auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: auto;
   margin: 0; padding: 8px 16px;
   font-size: 11px; letter-spacing: 2px;
   border-color: var(--clr-accent);
