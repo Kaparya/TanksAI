@@ -1,12 +1,14 @@
-#include "game_engine.h"
-#include "websocket_server.h"
-#include "http_server.h"
+#include "core/game.h"
+#include "net/websocket_server.h"
+#include "net/http_server.h"
+#include "net/connection_manager.h"
+#include "net/message_handler.h"
+#include "net/serializer.h"
 #include <cstdio>
 #include <cstring>
 #include <chrono>
 #include <thread>
 #include <string>
-#include <map>
 #include <signal.h>
 #include <unistd.h>
 #include <libgen.h>
@@ -17,39 +19,6 @@
 
 static volatile bool running = true;
 static void sigHandler(int) { running = false; }
-
-// ── Minimal JSON parser for tiny input messages ─────
-
-struct JsonValue {
-    std::string str;
-    bool boolean = false;
-};
-
-static std::string jsonGetString(const std::string& json, const std::string& key) {
-    std::string search = "\"" + key + "\"";
-    auto pos = json.find(search);
-    if (pos == std::string::npos) return "";
-    pos = json.find(':', pos);
-    if (pos == std::string::npos) return "";
-    pos = json.find('"', pos + 1);
-    if (pos == std::string::npos) return "";
-    auto end = json.find('"', pos + 1);
-    if (end == std::string::npos) return "";
-    return json.substr(pos + 1, end - pos - 1);
-}
-
-static bool jsonGetBool(const std::string& json, const std::string& key) {
-    std::string search = "\"" + key + "\"";
-    auto pos = json.find(search);
-    if (pos == std::string::npos) return false;
-    pos = json.find(':', pos);
-    if (pos == std::string::npos) return false;
-    auto rest = json.substr(pos + 1);
-    // Skip whitespace
-    size_t i = 0;
-    while (i < rest.size() && (rest[i] == ' ' || rest[i] == '\t')) i++;
-    return rest.substr(i, 4) == "true";
-}
 
 // ── Resolve client/ directory relative to executable ──
 
@@ -114,7 +83,7 @@ int main(int argc, char* argv[]) {
     printf("=== TANKS Game Server ===\n");
     printf("Static files: %s\n", clientDir.c_str());
 
-    // HTTP server (serves static files + detects WS upgrades)
+    // HTTP server (serves static files)
     HttpServer http;
     http.setStaticDir(clientDir);
     if (!http.listen(port)) {
@@ -123,18 +92,16 @@ int main(int argc, char* argv[]) {
     }
     printf("Listening on http://localhost:%d\n", port);
 
-    // WebSocket server (uses fds handed off from HTTP server)
+    // WebSocket server on port+1
     WebSocketServer ws;
     GameEngine game;
     InputState currentInputs[GameEngine::MAX_PLAYERS];
-    std::map<int, int> fdToPlayerId;
+    ConnectionManager connMgr;
 
-    // When HTTP detects a WS upgrade, hand the fd to the WS server
     http.setOnUpgrade([](int /*fd*/, const std::string& /*data*/) {
         // WS runs on its own port, so upgrades on HTTP port are ignored.
     });
 
-    // Simpler approach: WS on port+1
     if (!ws.listen(port + 1)) {
         fprintf(stderr, "Failed to bind WebSocket on port %d\n", port + 1);
         return 1;
@@ -142,63 +109,15 @@ int main(int argc, char* argv[]) {
     printf("WebSocket on ws://localhost:%d\n", port + 1);
 
     ws.setOnConnect([&](int fd) {
-        int playerId = game.addPlayer();
-        if (playerId < 0) {
-            ws.send(fd, "{\"type\":\"full\"}");
-            printf("[WS] Client %d rejected — server full\n", fd);
-            return;
-        }
-        fdToPlayerId[fd] = playerId;
-        std::string welcome = "{\"type\":\"welcome\",\"playerId\":" + std::to_string(playerId) + "}";
-        ws.send(fd, welcome);
-        printf("[WS] Client %d connected as player %d\n", fd, playerId);
+        connMgr.onConnect(game, ws, fd);
     });
 
     ws.setOnDisconnect([&](int fd) {
-        auto it = fdToPlayerId.find(fd);
-        if (it != fdToPlayerId.end()) {
-            int playerId = it->second;
-            game.removePlayer(playerId);
-            std::memset(&currentInputs[playerId], 0, sizeof(InputState));
-            fdToPlayerId.erase(it);
-            printf("[WS] Client %d (player %d) disconnected\n", fd, playerId);
-        }
+        connMgr.onDisconnect(game, currentInputs, fd);
     });
 
     ws.setOnMessage([&](int fd, const std::string& msg) {
-        std::string type = jsonGetString(msg, "type");
-
-        if (type == "start") {
-            bool hard = jsonGetBool(msg, "hardmode");
-            game.start(hard);
-            printf("[Game] Started (hardmode=%d)\n", hard);
-        } else if (type == "pause") {
-            game.pause();
-        } else if (type == "resume") {
-            game.resume();
-        } else if (type == "restart") {
-            game.restart();
-        } else if (type == "quit") {
-            game.quit();
-        } else if (type == "buy") {
-            auto it = fdToPlayerId.find(fd);
-            if (it == fdToPlayerId.end()) return;
-            std::string upgrade = jsonGetString(msg, "upgrade");
-            game.buyUpgrade(it->second, upgrade);
-        } else if (type == "input") {
-            auto it = fdToPlayerId.find(fd);
-            if (it == fdToPlayerId.end()) return;
-            int playerId = it->second;
-            auto keysPos = msg.find("\"keys\"");
-            if (keysPos != std::string::npos) {
-                std::string keysStr = msg.substr(keysPos);
-                currentInputs[playerId].up    = jsonGetBool(keysStr, "up");
-                currentInputs[playerId].down  = jsonGetBool(keysStr, "down");
-                currentInputs[playerId].left  = jsonGetBool(keysStr, "left");
-                currentInputs[playerId].right = jsonGetBool(keysStr, "right");
-                currentInputs[playerId].shoot = jsonGetBool(keysStr, "shoot");
-            }
-        }
+        handleMessage(game, currentInputs, connMgr.fdToPlayerId, fd, msg);
     });
 
     printf("\nOpen http://localhost:%d in your browser to play!\n\n", port);

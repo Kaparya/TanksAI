@@ -37,14 +37,14 @@ const App = (() => {
       return;
     }
     Network.sendStart(hardmode);
-    UI.showGame();
+    Overlays.showGame();
     currentState = 'playing';
   }
 
   function togglePause() {
     if (currentState === 'playing') {
       Network.sendPause();
-      UI.showPause();
+      Overlays.showPause();
       currentState = 'paused';
     } else if (currentState === 'paused') {
       resumeGame();
@@ -53,80 +53,68 @@ const App = (() => {
 
   function resumeGame() {
     Network.sendResume();
-    UI.hidePause();
+    Overlays.hidePause();
     currentState = 'playing';
   }
 
   function quitToMenu() {
     Network.sendQuit();
-    UI.showMenu();
+    Overlays.showMenu();
     currentState = 'menu';
     Renderer.clear();
   }
 
   function restartGame() {
     Network.sendRestart();
-    UI.hideGameOver();
+    Overlays.hideGameOver();
     currentState = 'playing';
   }
 
   function handleState(state) {
     // Auto-join if game is already running (player 2 joining mid-game)
     if ((state.gameState === 'playing' || state.gameState === 'wave_clear') && currentState === 'menu') {
-      UI.showGame();
+      Overlays.showGame();
       currentState = state.gameState === 'wave_clear' ? 'wave_clear' : 'playing';
     }
 
     // Update HUD
     if (state.gameState === 'playing' || state.gameState === 'paused' || state.gameState === 'wave_clear') {
-      UI.updateHUD(state);
+      HUD.updateHUD(state);
     }
 
     // Detect wave clear from server
     if (state.gameState === 'wave_clear' && currentState !== 'wave_clear') {
       currentState = 'wave_clear';
-      UI.showWaveClear(state);
+      Shop.showWaveClear(state);
     }
     if (state.gameState === 'wave_clear' && currentState === 'wave_clear') {
-      UI.updateWaveClear(state);
+      Shop.updateWaveClear(state);
     }
     if (state.gameState === 'playing' && currentState === 'wave_clear') {
       currentState = 'playing';
-      UI.hideWaveClear();
+      Shop.hideWaveClear();
     }
 
     // Detect game over from server
     if (state.gameState === 'gameover' && currentState !== 'gameover') {
       currentState = 'gameover';
-      UI.showGameOver(state.score, state.wave);
+      Overlays.showGameOver(state.score, state.wave);
     }
 
     // Detect pause from server
     if (state.gameState === 'paused' && currentState !== 'paused') {
       currentState = 'paused';
-      UI.showPause();
+      Overlays.showPause();
     }
 
     // Render
     Renderer.draw(state);
   }
 
-  // ── Input sending loop ──
-  let inputSendInterval = null;
-
-  function startInputLoop() {
-    if (inputSendInterval) return;
-    inputSendInterval = setInterval(() => {
-      if (currentState === 'playing' && Network.isConnected()) {
-        Network.sendInput(Input.getState());
-      }
-    }, 16); // ~60 FPS
-  }
-
   // ── Render loop ──
   function loop() {
     if (currentState === 'menu') {
-      UI.drawMenuBg();
+      MenuBg.drawMenuBg();
     }
     // Send input each frame if playing
     if (currentState === 'playing' && Network.isConnected()) {

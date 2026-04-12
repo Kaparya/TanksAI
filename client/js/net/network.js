@@ -21,14 +21,14 @@ const Network = (() => {
 
     const url = getWsUrl();
     console.log('[Network] Connecting to', url);
-    UI.setConnectionStatus('connecting');
+    ConnectionUI.setConnectionStatus('connecting');
 
     ws = new WebSocket(url);
 
     ws.onopen = () => {
       connected = true;
       console.log('[Network] Connected');
-      UI.setConnectionStatus('connected');
+      ConnectionUI.setConnectionStatus('connected');
       if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
     };
 
@@ -54,12 +54,12 @@ const Network = (() => {
       connected = false;
       myPlayerId = null;
       console.log('[Network] Disconnected');
-      UI.setConnectionStatus('disconnected');
+      ConnectionUI.setConnectionStatus('disconnected');
       scheduleReconnect();
     };
 
     ws.onerror = () => {
-      UI.setConnectionStatus('disconnected');
+      ConnectionUI.setConnectionStatus('disconnected');
     };
   }
 

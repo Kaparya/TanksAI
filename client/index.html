@@ -101,10 +101,31 @@
     <span id="conn-text">Connecting...</span>
   </div>
 
-  <script src="js/network.js"></script>
+  <!-- Shared -->
+  <script src="js/constants.js"></script>
+  <script src="js/themes.js"></script>
+
+  <!-- Network & Input -->
+  <script src="js/ui/connection.js"></script>
+  <script src="js/net/network.js"></script>
   <script src="js/input.js"></script>
-  <script src="js/renderer.js"></script>
-  <script src="js/ui.js"></script>
+
+  <!-- Rendering -->
+  <script src="js/rendering/wall-renderer.js"></script>
+  <script src="js/rendering/tank-renderer.js"></script>
+  <script src="js/rendering/bullet-renderer.js"></script>
+  <script src="js/rendering/particle-renderer.js"></script>
+  <script src="js/rendering/minimap-renderer.js"></script>
+  <script src="js/rendering/effects-renderer.js"></script>
+  <script src="js/rendering/renderer.js"></script>
+
+  <!-- UI -->
+  <script src="js/ui/menu-bg.js"></script>
+  <script src="js/ui/hud.js"></script>
+  <script src="js/ui/shop.js"></script>
+  <script src="js/ui/overlays.js"></script>
+
+  <!-- App (last — depends on everything) -->
   <script src="js/app.js"></script>
 </body>
 </html>
