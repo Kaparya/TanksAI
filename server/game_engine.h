@@ -89,6 +89,7 @@ public:
     int screenShake = 0;
     int frameCount = 0;
     GameState state = GameState::MENU;
+    const char* mapTheme = "standard";
 
     // Economy
     int money[MAX_PLAYERS] = {0, 0};

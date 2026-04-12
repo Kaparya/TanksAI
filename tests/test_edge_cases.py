@@ -288,6 +288,7 @@ async def test_state_schema_invariants():
         required_fields = {
             "type", "gameState", "score", "wave", "enemiesLeft",
             "screenShake", "frameCount", "hardmode", "waveClearTimer",
+            "mapTheme",
             "players", "walls", "enemies", "bullets", "particles"
         }
         samples_checked = 0

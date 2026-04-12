@@ -12,12 +12,53 @@ const Renderer = (() => {
   const TILE = 40;
   const COLS = 20, ROWS = 15;
 
+  // ── Map theme palettes ──
+  const THEMES = {
+    standard: {
+      bg: '#181c24', grid: 'rgba(255,255,255,.03)',
+      brick1: '#7a3a2a', brick2: '#8b4533', brickLine: '#5a2a1a',
+      brickHi: 'rgba(255,255,255,.06)',
+      steel1: '#4a4e5c', steel2: '#5c6070', steel3: '#4a4e5c',
+      steelRivet: '#6a6e7c', steelHi: 'rgba(255,255,255,.08)',
+      mmBg: '#0a0c10', mmBrick: '#553322', mmSteel: '#556',
+    },
+    snow: {
+      bg: '#d0dce8', grid: 'rgba(0,0,40,.04)',
+      brick1: '#a8c8e0', brick2: '#c0ddf0', brickLine: '#7aa0be',
+      brickHi: 'rgba(255,255,255,.15)',
+      steel1: '#8090a0', steel2: '#98aab8', steel3: '#8090a0',
+      steelRivet: '#b0c0cc', steelHi: 'rgba(255,255,255,.18)',
+      mmBg: '#b8c8d8', mmBrick: '#8ab0cc', mmSteel: '#6888a0',
+    },
+    sand: {
+      bg: '#2e2818', grid: 'rgba(255,220,160,.04)',
+      brick1: '#b08850', brick2: '#c49860', brickLine: '#8a6830',
+      brickHi: 'rgba(255,240,200,.08)',
+      steel1: '#8a7a60', steel2: '#a0906e', steel3: '#8a7a60',
+      steelRivet: '#b0a080', steelHi: 'rgba(255,240,200,.10)',
+      mmBg: '#1e1808', mmBrick: '#907040', mmSteel: '#706050',
+    },
+    city: {
+      bg: '#101218', grid: 'rgba(0,200,255,.03)',
+      brick1: '#585c64', brick2: '#686e78', brickLine: '#40444c',
+      brickHi: 'rgba(0,220,255,.06)',
+      steel1: '#282c34', steel2: '#363a44', steel3: '#282c34',
+      steelRivet: '#00ccff', steelHi: 'rgba(0,220,255,.10)',
+      mmBg: '#08090c', mmBrick: '#44484e', mmSteel: '#223',
+    },
+  };
+
+  function getTheme(state) {
+    return THEMES[state.mapTheme] || THEMES.standard;
+  }
+
   // Bullet trails (client-side visual only)
   const bulletTrails = new Map(); // keyed by "x,y" approx
   let trailId = 0;
 
   function draw(state) {
     if (!state || !state.walls) return;
+    const theme = getTheme(state);
 
     ctx.save();
 
@@ -29,11 +70,11 @@ const Renderer = (() => {
     }
 
     // Floor
-    ctx.fillStyle = '#181c24';
+    ctx.fillStyle = theme.bg;
     ctx.fillRect(0, 0, W, H);
 
     // Grid
-    ctx.strokeStyle = 'rgba(255,255,255,.03)';
+    ctx.strokeStyle = theme.grid;
     ctx.lineWidth = 1;
     for (let x = 0; x <= W; x += TILE) {
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
@@ -42,7 +83,7 @@ const Renderer = (() => {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
     }
 
-    drawWalls(state.walls);
+    drawWalls(state.walls, theme);
     if (state.players) {
       for (const p of state.players) drawTank(p, true, state.frameCount);
     }
@@ -52,22 +93,22 @@ const Renderer = (() => {
     drawWaveAnnouncement(state);
 
     ctx.restore();
-    drawMinimap(state);
+    drawMinimap(state, theme);
   }
 
-  function drawWalls(walls) {
+  function drawWalls(walls, theme) {
     for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
       const px = x * TILE, py = y * TILE;
       if (walls[y][x] === 1) {
         // Brick
-        ctx.fillStyle = '#7a3a2a';
+        ctx.fillStyle = theme.brick1;
         ctx.fillRect(px + 1, py + 1, TILE - 2, TILE - 2);
-        ctx.fillStyle = '#8b4533';
+        ctx.fillStyle = theme.brick2;
         ctx.fillRect(px + 2, py + 2, TILE / 2 - 3, TILE / 2 - 3);
         ctx.fillRect(px + TILE / 2, py + 2, TILE / 2 - 3, TILE / 2 - 3);
         ctx.fillRect(px + 2, py + TILE / 2, TILE / 2 - 3, TILE / 2 - 3);
         ctx.fillRect(px + TILE / 2, py + TILE / 2, TILE / 2 - 3, TILE / 2 - 3);
-        ctx.strokeStyle = '#5a2a1a';
+        ctx.strokeStyle = theme.brickLine;
         ctx.lineWidth = 1;
         ctx.strokeRect(px + 1, py + 1, TILE - 2, TILE - 2);
         ctx.beginPath();
@@ -76,22 +117,22 @@ const Renderer = (() => {
         ctx.moveTo(px + TILE / 2, py + 1);
         ctx.lineTo(px + TILE / 2, py + TILE - 1);
         ctx.stroke();
-        ctx.fillStyle = 'rgba(255,255,255,.06)';
+        ctx.fillStyle = theme.brickHi;
         ctx.fillRect(px + 2, py + 2, TILE - 4, 2);
       } else if (walls[y][x] === 2) {
         // Steel
-        ctx.fillStyle = '#4a4e5c';
+        ctx.fillStyle = theme.steel1;
         ctx.fillRect(px + 1, py + 1, TILE - 2, TILE - 2);
-        ctx.fillStyle = '#5c6070';
+        ctx.fillStyle = theme.steel2;
         ctx.fillRect(px + 3, py + 3, TILE - 6, TILE - 6);
-        ctx.fillStyle = '#4a4e5c';
+        ctx.fillStyle = theme.steel3;
         ctx.fillRect(px + 6, py + 6, TILE - 12, TILE - 12);
-        ctx.fillStyle = '#6a6e7c';
+        ctx.fillStyle = theme.steelRivet;
         const cs = [[4,4],[TILE-6,4],[4,TILE-6],[TILE-6,TILE-6]];
         for (const [cx, cy] of cs) {
           ctx.beginPath(); ctx.arc(px + cx, py + cy, 2, 0, Math.PI * 2); ctx.fill();
         }
-        ctx.fillStyle = 'rgba(255,255,255,.08)';
+        ctx.fillStyle = theme.steelHi;
         ctx.fillRect(px + 2, py + 2, TILE - 4, 2);
       }
     }
@@ -237,19 +278,19 @@ const Renderer = (() => {
     }
   }
 
-  function drawMinimap(state) {
+  function drawMinimap(state, theme) {
     if (!state || !state.walls) return;
-    mctx.fillStyle = '#0a0c10';
+    mctx.fillStyle = theme.mmBg;
     mctx.fillRect(0, 0, 120, 90);
 
     const sx = 120 / W, sy = 90 / H;
 
     for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
       if (state.walls[y][x] === 1) {
-        mctx.fillStyle = '#553322';
+        mctx.fillStyle = theme.mmBrick;
         mctx.fillRect(x * TILE * sx, y * TILE * sy, TILE * sx, TILE * sy);
       } else if (state.walls[y][x] === 2) {
-        mctx.fillStyle = '#556';
+        mctx.fillStyle = theme.mmSteel;
         mctx.fillRect(x * TILE * sx, y * TILE * sy, TILE * sx, TILE * sy);
       }
     }

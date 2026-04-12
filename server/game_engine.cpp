@@ -41,6 +41,10 @@ void GameEngine::generateWalls() {
             }
         }
     }
+
+    // Random map theme
+    static const char* themes[] = {"standard", "snow", "sand", "city"};
+    mapTheme = themes[std::rand() % 4];
 }
 
 void GameEngine::initPlayer(int playerId) {
@@ -618,6 +622,7 @@ std::string GameEngine::serializeState() const {
     o += ",\"frameCount\":"; appendInt(o, frameCount);
     o += ",\"hardmode\":"; o += (hardmode ? "true" : "false");
     o += ",\"waveClearTimer\":"; appendInt(o, waveClearTimer);
+    o += ",\"mapTheme\":\""; o += mapTheme; o += "\"";
 
     // Players
     o += ",\"players\":[";
