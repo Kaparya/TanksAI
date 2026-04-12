@@ -94,31 +94,42 @@ void updateBullets(GameEngine& game) {
             Tank& p = game.players[pi];
             if (rectCollide(b.x - b.radius, b.y - b.radius, b.radius * 2, p.x - 14, p.y - 14, 28)) {
                 b.dead = true;
-                spawnExplosion(game.particles, p.x, p.y, p.color, 20);
-                game.screenShake = 12;
-                p.lives--;
-                if (p.lives <= 0) {
-                    p.alive = false;
-                    bool allDead = true;
-                    for (int j = 0; j < GameEngine::MAX_PLAYERS; j++) {
-                        if (game.playerActive[j] && game.players[j].lives > 0) {
-                            allDead = false;
-                            break;
+                p.hp--;
+                if (p.hp <= 0) {
+                    // Lost all HP for this life — respawn
+                    p.hp = p.maxHp;
+                    spawnExplosion(game.particles, p.x, p.y, p.color, 20);
+                    game.screenShake = 12;
+                    p.lives--;
+                    if (p.lives <= 0) {
+                        p.alive = false;
+                        bool allDead = true;
+                        for (int j = 0; j < GameEngine::MAX_PLAYERS; j++) {
+                            if (game.playerActive[j] && game.players[j].lives > 0) {
+                                allDead = false;
+                                break;
+                            }
                         }
-                    }
-                    if (allDead) {
-                        game.state = GameState::GAMEOVER;
+                        if (allDead) {
+                            game.state = GameState::GAMEOVER;
+                        }
+                    } else {
+                        if (pi == 0) {
+                            p.x = 1.5f * TILE;
+                            p.y = (ROWS - 2.5f) * TILE;
+                        } else {
+                            p.x = (COLS - 2.5f) * TILE;
+                            p.y = (ROWS - 2.5f) * TILE;
+                        }
+                        p.dir = 0;
+                        p.invuln = 90;
                     }
                 } else {
-                    if (pi == 0) {
-                        p.x = 1.5f * TILE;
-                        p.y = (ROWS - 2.5f) * TILE;
-                    } else {
-                        p.x = (COLS - 2.5f) * TILE;
-                        p.y = (ROWS - 2.5f) * TILE;
-                    }
-                    p.dir = 0;
-                    p.invuln = 90;
+                    // Took damage but still has HP — flash without respawn
+                    p.flash = 10;
+                    p.invuln = 45;
+                    spawnExplosion(game.particles, p.x, p.y, p.color, 6);
+                    game.screenShake = 5;
                 }
                 break;
             }

@@ -56,7 +56,7 @@ const Shop = (() => {
           '<div class="wc-item-icon">\uD83D\uDEE1\uFE0F</div>' +
           '<div class="wc-item-info">' +
             '<div class="wc-item-name">Armor</div>' +
-            '<div class="wc-item-desc">Longer invuln after hit</div>' +
+            '<div class="wc-item-desc">Increases your Health</div>' +
             '<div class="wc-item-stars" id="wc-armor-stars">\u2605\u2606\u2606</div>' +
           '</div>' +
           '<div class="wc-item-cost" id="wc-armor-cost">$25</div>' +

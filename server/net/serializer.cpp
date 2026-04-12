@@ -80,6 +80,7 @@ std::string serializeState(const GameEngine& game) {
         o += ",\"alive\":"; o += (p.alive ? "true" : "false");
         o += ",\"invuln\":"; appendInt(o, p.invuln);
         o += ",\"hp\":"; appendInt(o, p.hp);
+        o += ",\"maxHp\":"; appendInt(o, p.maxHp);
         o += ",\"lives\":"; appendInt(o, p.lives);
         o += ",\"money\":"; appendInt(o, game.money[i]);
         o += ",\"bulletDmgLevel\":"; appendInt(o, p.bulletDmgLevel);

@@ -61,7 +61,7 @@ const TankRenderer = (() => {
     ctx.fillRect(-12, -12, 24, 24);
 
     // Tracks
-    const trackColor = 'rgba(0,180,210,.55)';
+    const trackColor = isPlayer ? 'rgba(0,180,210,.55)' : 'rgba(180,80,60,.55)';
     ctx.fillStyle = trackColor;
     ctx.fillRect(-14, -14, 6, 28);
     ctx.fillRect(8, -14, 6, 28);
@@ -101,6 +101,22 @@ const TankRenderer = (() => {
       ctx.fillRect(x - bw / 2 - 1, y - 22, bw + 2, 5);
       ctx.fillStyle = hpRatio > .5 ? '#00e676' : hpRatio > .25 ? '#ff9100' : '#ff5252';
       ctx.fillRect(x - bw / 2, y - 21, bw * hpRatio, 3);
+    }
+
+    // HP pips for players with armor (maxHp > 1)
+    if (isPlayer && tank.maxHp > 1) {
+      const pipSize = 7;
+      const pipGap = 3;
+      const totalW = tank.maxHp * pipSize + (tank.maxHp - 1) * pipGap;
+      const startX = x - totalW / 2;
+      const pipY = y - 24;
+      for (let i = 0; i < tank.maxHp; i++) {
+        const px = startX + i * (pipSize + pipGap);
+        ctx.fillStyle = 'rgba(0,0,0,.6)';
+        ctx.fillRect(px - 1, pipY - 1, pipSize + 2, pipSize + 2);
+        ctx.fillStyle = i < tank.hp ? tank.color : 'rgba(255,255,255,.15)';
+        ctx.fillRect(px, pipY, pipSize, pipSize);
+      }
     }
 
     // Invulnerability shield

@@ -28,14 +28,8 @@ bool buyUpgrade(GameEngine& game, int playerId, const std::string& upgrade) {
         if (game.money[playerId] < cost) return false;
         game.money[playerId] -= cost;
         p.armorLevel++;
-        // Max lives table: [normal, hardmode] x [L1, L2, L3]
-        // Normal: 4 → 6 → 8 (~200% → 300% → 400%)
-        // Hardmode: 2 → 3 → 4
-        static const int livesTable[2][3] = { {4, 6, 8}, {2, 3, 4} };
-        int mode = game.hardmode ? 1 : 0;
-        int newMax = livesTable[mode][p.armorLevel - 1];
-        int oldMax = livesTable[mode][p.armorLevel - 2];
-        p.lives += (newMax - oldMax);
+        p.maxHp = p.armorLevel; // Lv1=1 hp, Lv2=2 hp, Lv3=3 hp per life
+        p.hp = p.maxHp;         // restore to full on upgrade
         return true;
     }
     return false;
