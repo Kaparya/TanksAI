@@ -2,9 +2,9 @@ const Shop = (() => {
   const waveClearEl = document.getElementById('wave-clear');
 
   const UPGRADE_COSTS = {
-    damage: [0, 20, 50],
-    size:   [0, 15, 35],
-    armor:  [0, 25, 60],
+    damage: [0, 25, 75],
+    size:   [0, 20, 60],
+    armor:  [0, 30, 90],
   };
 
   function levelStars(level, max) {
