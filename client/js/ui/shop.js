@@ -4,6 +4,7 @@ const Shop = (() => {
   const UPGRADE_COSTS = {
     damage: [0, 20, 50],
     size:   [0, 15, 35],
+    armor:  [0, 25, 60],
   };
 
   function levelStars(level, max) {
@@ -51,10 +52,21 @@ const Shop = (() => {
           '<div class="wc-item-cost" id="wc-size-cost">$15</div>' +
           '<button class="btn wc-buy-btn" id="wc-btn-size">Buy</button>' +
         '</div>' +
+        '<div class="wc-shop-item">' +
+          '<div class="wc-item-icon">\uD83D\uDEE1\uFE0F</div>' +
+          '<div class="wc-item-info">' +
+            '<div class="wc-item-name">Armor</div>' +
+            '<div class="wc-item-desc">Longer invuln after hit</div>' +
+            '<div class="wc-item-stars" id="wc-armor-stars">\u2605\u2606\u2606</div>' +
+          '</div>' +
+          '<div class="wc-item-cost" id="wc-armor-cost">$25</div>' +
+          '<button class="btn wc-buy-btn" id="wc-btn-armor">Buy</button>' +
+        '</div>' +
       '</div>';
 
     document.getElementById('wc-btn-damage').addEventListener('click', () => Network.sendBuy('damage'));
     document.getElementById('wc-btn-size').addEventListener('click', () => Network.sendBuy('size'));
+    document.getElementById('wc-btn-armor').addEventListener('click', () => Network.sendBuy('armor'));
 
     updateWaveClear(state);
     waveClearEl.classList.add('active');
@@ -88,6 +100,17 @@ const Shop = (() => {
     document.getElementById('wc-size-cost').textContent = sizeMaxed ? 'MAX' : '$' + sizeCost;
     const sizeBtn = document.getElementById('wc-btn-size');
     if (sizeBtn) sizeBtn.disabled = sizeMaxed || money < sizeCost;
+
+    // Armor upgrade
+    const armorLevel = me.armorLevel || 1;
+    const armorMaxed = armorLevel >= 3;
+    const armorCost = UPGRADE_COSTS.armor[armorLevel] || 0;
+    const armorStarsEl = document.getElementById('wc-armor-stars');
+    const armorCostEl = document.getElementById('wc-armor-cost');
+    const armorBtn = document.getElementById('wc-btn-armor');
+    if (armorStarsEl) armorStarsEl.textContent = levelStars(armorLevel, 3);
+    if (armorCostEl) armorCostEl.textContent = armorMaxed ? 'MAX' : '$' + armorCost;
+    if (armorBtn) armorBtn.disabled = armorMaxed || money < armorCost;
 
     // Also update per-player money cards
     for (const p of (state.players || [])) {

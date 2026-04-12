@@ -1,7 +1,46 @@
 const TankRenderer = (() => {
+  function drawArmorPlates(ctx, armorLevel) {
+    if (armorLevel < 2) return;
+
+    if (armorLevel === 2) {
+      // Light armor: two thin metallic side strips
+      ctx.fillStyle = '#8a9bb0';
+      ctx.fillRect(-16, -10, 4, 20);
+      ctx.fillRect(12, -10, 4, 20);
+      // Highlight edge
+      ctx.fillStyle = 'rgba(200,220,255,.4)';
+      ctx.fillRect(-16, -10, 1, 20);
+      ctx.fillRect(15, -10, 1, 20);
+    } else {
+      // Heavy armor: thick dark-steel plates with corner bolts
+      ctx.fillStyle = '#3d4a5c';
+      ctx.fillRect(-17, -13, 5, 26);
+      ctx.fillRect(12, -13, 5, 26);
+      // Top / bottom cross-plates
+      ctx.fillRect(-12, -17, 24, 5);
+      ctx.fillRect(-12, 12, 24, 5);
+      // Highlight
+      ctx.fillStyle = 'rgba(160,190,220,.35)';
+      ctx.fillRect(-17, -13, 1, 26);
+      ctx.fillRect(-12, -17, 24, 1);
+      // Corner bolts (4 per side = 8 total)
+      ctx.fillStyle = '#aab8c8';
+      const boltPositions = [
+        [-15, -11], [-15, 7],
+        [13, -11],  [13, 7],
+        [-10, -15], [8, -15],
+        [-10, 13],  [8, 13],
+      ];
+      for (const [bx, by] of boltPositions) {
+        ctx.fillRect(bx, by, 2, 2);
+      }
+    }
+  }
+
   function draw(ctx, tank, isPlayer, frameCount) {
     if (!tank || !tank.alive) return;
     const { x, y, dir, color } = tank;
+    const armorLevel = tank.armorLevel || 1;
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(dir * Math.PI / 2);
@@ -35,6 +74,9 @@ const TankRenderer = (() => {
       ctx.beginPath(); ctx.moveTo(-14, i); ctx.lineTo(-8, i); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(8, i); ctx.lineTo(14, i); ctx.stroke();
     }
+
+    // Armor plates (drawn over body, under turret)
+    if (isPlayer) drawArmorPlates(ctx, armorLevel);
 
     // Turret
     ctx.fillStyle = '#1a1a2e';

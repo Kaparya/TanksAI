@@ -22,6 +22,13 @@ bool buyUpgrade(GameEngine& game, int playerId, const std::string& upgrade) {
         p.bulletSizeLevel++;
         p.bulletRadius = 3 + (p.bulletSizeLevel - 1) * 2;
         return true;
+    } else if (upgrade == "armor") {
+        if (p.armorLevel >= 3) return false;
+        int cost = p.armorLevel == 1 ? 25 : 60;
+        if (game.money[playerId] < cost) return false;
+        game.money[playerId] -= cost;
+        p.armorLevel++;
+        return true;
     }
     return false;
 }

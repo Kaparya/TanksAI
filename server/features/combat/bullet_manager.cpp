@@ -118,7 +118,9 @@ void updateBullets(GameEngine& game) {
                         p.y = (ROWS - 2.5f) * TILE;
                     }
                     p.dir = 0;
-                    p.invuln = 90;
+                    // Armor increases post-hit invulnerability window
+                    int invulnFrames = (p.armorLevel == 3) ? 200 : (p.armorLevel == 2) ? 120 : 60;
+                    p.invuln = invulnFrames;
                 }
                 break;
             }

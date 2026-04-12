@@ -84,6 +84,7 @@ std::string serializeState(const GameEngine& game) {
         o += ",\"money\":"; appendInt(o, game.money[i]);
         o += ",\"bulletDmgLevel\":"; appendInt(o, p.bulletDmgLevel);
         o += ",\"bulletSizeLevel\":"; appendInt(o, p.bulletSizeLevel);
+        o += ",\"armorLevel\":"; appendInt(o, p.armorLevel);
         o += ",\"color\":\""; o += escStr(p.color); o += "\"}";
     }
     o += "]";

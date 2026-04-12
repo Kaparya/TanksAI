@@ -23,6 +23,8 @@ struct Tank {
     int bulletRadius = 3;
     int bulletDmgLevel = 1;
     int bulletSizeLevel = 1;
+    // Armor upgrade (players only) — level 1 = none, 2 = light, 3 = heavy
+    int armorLevel = 1;
     // AI fields (enemies only)
     int aiTimer = 0;
     int aiDir = 2;
