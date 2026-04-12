@@ -71,7 +71,7 @@ void updateBullets(GameEngine& game) {
                         e.alive = false;
                         spawnExplosion(game.particles, e.x, e.y, e.color, 25);
                         game.screenShake = 8;
-                        int reward = 10 * (game.wave * 0.5);
+                        int reward = 10 * e.maxHp;
                         game.score += reward;
                         if (b.owner >= 0 && b.owner < GameEngine::MAX_PLAYERS) {
                             game.money[b.owner] += reward;
@@ -118,9 +118,7 @@ void updateBullets(GameEngine& game) {
                         p.y = (ROWS - 2.5f) * TILE;
                     }
                     p.dir = 0;
-                    // Armor increases post-hit invulnerability window
-                    int invulnFrames = (p.armorLevel == 3) ? 200 : (p.armorLevel == 2) ? 120 : 60;
-                    p.invuln = invulnFrames;
+                    p.invuln = 90;
                 }
                 break;
             }
