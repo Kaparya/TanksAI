@@ -72,7 +72,7 @@ void advanceWave(GameEngine& game) {
         p.invuln = 90;
         p.alive = true;
         // Max lives respect armor level
-        static const int livesTable[2][3] = { {3, 5, 6}, {1, 2, 3} };
+        static const int livesTable[2][3] = { {4, 6, 8}, {2, 3, 4} };
         int mode = game.hardmode ? 1 : 0;
         int maxLives = livesTable[mode][p.armorLevel - 1];
         if (p.lives < maxLives) p.lives++;
