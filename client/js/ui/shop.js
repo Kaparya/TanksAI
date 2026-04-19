@@ -4,7 +4,7 @@ const Shop = (() => {
   const UPGRADE_COSTS = {
     damage: [0, 25, 75],
     size:   [0, 20, 60],
-    armor:  [0, 30, 90],
+    armor:  [0, 250, 1000],
   };
 
   function levelStars(level, max) {

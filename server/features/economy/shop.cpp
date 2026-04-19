@@ -8,7 +8,7 @@ static const int UPGRADE_COSTS[3][3] = {
     //  Lv1→2  Lv2→3
     {0,  25,  75},  // damage
     {0,  20,  60},  // size
-    {0,  30,  90},  // armor
+    {0,  250,  1000},  // armor
 };
 static const int IDX_DAMAGE = 0;
 static const int IDX_SIZE   = 1;
