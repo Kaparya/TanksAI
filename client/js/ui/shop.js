@@ -6,6 +6,7 @@ const Shop = (() => {
     size:   [0, 20, 60],
     armor:  [0, 250, 1000],
     explosive: 300, // one-time, mirrors EXPLOSIVE_AMMO_COST in server/features/economy/shop.cpp
+    laser: 500,     // one-time, mirrors LASER_WEAPON_COST in server/features/economy/shop.cpp
   };
 
   function levelStars(level, max) {
@@ -73,12 +74,23 @@ const Shop = (() => {
           '<div class="wc-item-cost" id="wc-exp-cost">$300</div>' +
           '<button class="btn wc-buy-btn" id="wc-btn-explosive">Buy</button>' +
         '</div>' +
+        '<div class="wc-shop-item wc-shop-item-wide">' +
+          '<div class="wc-item-icon">\u2696\uFE0F</div>' +
+          '<div class="wc-item-info">' +
+            '<div class="wc-item-name">Laser Weapon</div>' +
+            '<div class="wc-item-desc">Instant piercing beam (replaces bullets)</div>' +
+            '<div class="wc-item-stars" id="wc-laser-stars">\u2014</div>' +
+          '</div>' +
+          '<div class="wc-item-cost" id="wc-laser-cost">$500</div>' +
+          '<button class="btn wc-buy-btn" id="wc-btn-laser">Buy</button>' +
+        '</div>' +
       '</div>';
 
     document.getElementById('wc-btn-damage').addEventListener('click', () => Network.sendBuy('damage'));
     document.getElementById('wc-btn-size').addEventListener('click', () => Network.sendBuy('size'));
     document.getElementById('wc-btn-armor').addEventListener('click', () => Network.sendBuy('armor'));
     document.getElementById('wc-btn-explosive').addEventListener('click', () => Network.sendBuy('explosive'));
+    document.getElementById('wc-btn-laser').addEventListener('click', () => Network.sendBuy('laser'));
 
     updateWaveClear(state);
     waveClearEl.classList.add('active');
@@ -133,6 +145,16 @@ const Shop = (() => {
     if (expStarsEl) expStarsEl.textContent = hasExplosive ? 'Owned' : 'Not owned';
     if (expCostEl) expCostEl.textContent = hasExplosive ? '\u2014' : '$' + expCost;
     if (expBtn) expBtn.disabled = hasExplosive || money < expCost;
+
+    // Laser weapon (one-time)
+    const hasLaser = !!me.laserWeapon;
+    const laserCost = UPGRADE_COSTS.laser;
+    const laserStarsEl = document.getElementById('wc-laser-stars');
+    const laserCostEl = document.getElementById('wc-laser-cost');
+    const laserBtn = document.getElementById('wc-btn-laser');
+    if (laserStarsEl) laserStarsEl.textContent = hasLaser ? 'Owned' : 'Not owned';
+    if (laserCostEl) laserCostEl.textContent = hasLaser ? '\u2014' : '$' + laserCost;
+    if (laserBtn) laserBtn.disabled = hasLaser || money < laserCost;
 
     // Also update per-player money cards
     for (const p of (state.players || [])) {

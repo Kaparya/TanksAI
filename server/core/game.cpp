@@ -45,6 +45,7 @@ void GameEngine::start(bool hard) {
     enemiesLeft = 4;
     waveClearTimer = 0;
     for (int i = 0; i < MAX_PLAYERS; i++) money[i] = 0;
+    for (int i = 0; i < MAX_PLAYERS; i++) laserBeam[i] = {};
     screenShake = 0;
     frameCount = 0;
     state = GameState::PLAYING;
@@ -73,7 +74,10 @@ void GameEngine::moveTank(Tank& tank, int dir, float spd) {
     ::moveTank(*this, tank, dir, spd);
 }
 void GameEngine::shoot(Tank& tank, int owner) {
-    ::shootBullet(*this, tank, owner);
+    if (tank.laserWeapon)
+        ::fireLaser(*this, tank, owner);
+    else
+        ::shootBullet(*this, tank, owner);
 }
 void GameEngine::spawnExplosion(float x, float y, const std::string& color, int count) {
     ::spawnExplosion(particles, x, y, color, count);
@@ -94,6 +98,7 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
     if (state == GameState::WAVE_CLEAR) {
         waveClearTimer--;
         updateParticles(particles);
+        updateLaserBeams(*this);
         if (waveClearTimer <= 0) {
             advanceWave();
         }
@@ -127,6 +132,7 @@ void GameEngine::tick(const InputState inputs[MAX_PLAYERS]) {
 
     // Bullets
     updateBullets(*this);
+    updateLaserBeams(*this);
 
     // Spawn enemies / next wave
     checkWaveProgression(*this);

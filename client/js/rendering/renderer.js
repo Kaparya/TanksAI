@@ -34,6 +34,7 @@ const Renderer = (() => {
       for (const p of state.players) TankRenderer.draw(ctx, p, true, state.frameCount);
     }
     for (const e of state.enemies) TankRenderer.draw(ctx, e, false, state.frameCount);
+    LaserRenderer.draw(ctx, state.lasers);
     BulletRenderer.draw(ctx, state.bullets);
     ParticleRenderer.draw(ctx, state.particles);
     EffectsRenderer.drawWaveAnnouncement(ctx, state);

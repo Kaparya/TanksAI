@@ -27,6 +27,8 @@ struct Tank {
     int armorLevel = 1;
     // Explosive ammo (players only) — one-time shop purchase; bullets deal AoE on impact
     bool explosiveAmmo = false;
+    // Laser weapon (players only) — one-time; shoot fires instant piercing beam instead of bullets
+    bool laserWeapon = false;
     // AI fields (enemies only)
     int aiTimer = 0;
     int aiDir = 2;
@@ -57,3 +59,9 @@ struct InputState {
 };
 
 enum class GameState { MENU, PLAYING, PAUSED, GAMEOVER, WAVE_CLEAR };
+
+// Client visual for last laser shot (beam segment, fades over ttl frames)
+struct LaserBeamVisual {
+    float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+    int ttl = 0;
+};

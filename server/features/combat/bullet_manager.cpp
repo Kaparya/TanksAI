@@ -2,8 +2,10 @@
 #include "collision.h"
 #include "../particles/particle_system.h"
 #include "../../game_engine.h"
+#include "../../constants.h"
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 namespace {
 
@@ -125,7 +127,149 @@ static void applyExplosiveRadius(GameEngine& game, float cx, float cy, int owner
     }
 }
 
+// Squared distance from point to closed segment — for laser vs enemy bullet (circle)
+static float distPointSegmentSq(float px, float py, float x0, float y0, float x1, float y1) {
+    float dx = x1 - x0, dy = y1 - y0;
+    float len2 = dx * dx + dy * dy;
+    if (len2 < 1e-6f) {
+        float ddx = px - x0, ddy = py - y0;
+        return ddx * ddx + ddy * ddy;
+    }
+    float t = ((px - x0) * dx + (py - y0) * dy) / len2;
+    if (t < 0.f) t = 0.f;
+    else if (t > 1.f) t = 1.f;
+    float qx = x0 + t * dx, qy = y0 + t * dy;
+    float ddx = px - qx, ddy = py - qy;
+    return ddx * ddx + ddy * ddy;
+}
+
+static bool laserSegmentHitsBullet(float x0, float y0, float x1, float y1, const Bullet& b) {
+    float r = b.radius;
+    return distPointSegmentSq(b.x, b.y, x0, y0, x1, y1) <= r * r;
+}
+
+static bool laserSegmentHitsTank(float x0, float y0, float x1, float y1, float cx, float cy) {
+    const int samples = 40;
+    for (int s = 0; s <= samples; s++) {
+        float t = s / static_cast<float>(samples);
+        float px = x0 + (x1 - x0) * t;
+        float py = y0 + (y1 - y0) * t;
+        if (px >= cx - 14.f && px <= cx + 14.f && py >= cy - 14.f && py <= cy + 14.f)
+            return true;
+    }
+    return false;
+}
+
+static void fireLaserImpl(GameEngine& game, Tank& tank, int owner) {
+    if (tank.cooldownTimer > 0) return;
+    tank.cooldownTimer = tank.cooldown;
+
+    int d = tank.dir;
+    float sx = tank.x + DX[d] * 18.f;
+    float sy = tank.y + DY[d] * 18.f;
+    float ex = sx, ey = sy;
+    const float step = 3.f;
+    const float maxLen = 1000.f;
+
+    for (float dist = step; dist < maxLen; dist += step) {
+        float px = sx + DX[d] * dist;
+        float py = sy + DY[d] * dist;
+        if (px < 0.f || px >= static_cast<float>(MAP_W) || py < 0.f || py >= static_cast<float>(MAP_H))
+            break;
+        int tx = static_cast<int>(px) / TILE;
+        int ty = static_cast<int>(py) / TILE;
+        int w = game.walls[ty][tx];
+        if (w == 2) {
+            ex = sx + DX[d] * (dist - step);
+            ey = sy + DY[d] * (dist - step);
+            break;
+        }
+        if (w == 1) {
+            game.walls[ty][tx] = 0;
+            game.wallsDirty_ = true;
+            spawnExplosion(game.particles, tx * TILE + TILE * 0.5f, ty * TILE + TILE * 0.5f, "#ff9800", 3);
+        }
+        ex = px;
+        ey = py;
+    }
+
+    // Destroy enemy bullets the beam intersects (same idea as player bullet vs enemy bullet)
+    for (auto& b : game.bullets) {
+        if (b.dead || b.owner >= 0) continue;
+        if (!laserSegmentHitsBullet(sx, sy, ex, ey, b)) continue;
+        b.dead = true;
+        spawnExplosion(game.particles, b.x, b.y, "#fff", 10);
+    }
+
+    game.laserBeam[owner].x0 = sx;
+    game.laserBeam[owner].y0 = sy;
+    game.laserBeam[owner].x1 = ex;
+    game.laserBeam[owner].y1 = ey;
+    game.laserBeam[owner].ttl = 15;
+
+    spawnExplosion(game.particles, ex, ey, "#00e5ff", 12);
+    game.screenShake = std::max(game.screenShake, 7);
+
+    const int dmg = tank.bulletDamage;
+
+    struct EnemyHit {
+        size_t idx;
+        float along;
+    };
+    std::vector<EnemyHit> hits;
+    for (size_t i = 0; i < game.enemies.size(); i++) {
+        if (!game.enemies[i].alive) continue;
+        if (!laserSegmentHitsTank(sx, sy, ex, ey, game.enemies[i].x, game.enemies[i].y)) continue;
+        float along = (game.enemies[i].x - sx) * DX[d] + (game.enemies[i].y - sy) * DY[d];
+        if (along < 0.f) continue;
+        hits.push_back({i, along});
+    }
+    std::sort(hits.begin(), hits.end(), [](const EnemyHit& a, const EnemyHit& b) { return a.along < b.along; });
+
+    for (const auto& h : hits) {
+        auto& e = game.enemies[h.idx];
+        if (!e.alive) continue;
+        e.hp -= dmg;
+        e.flash = 6;
+        if (e.hp <= 0) {
+            e.alive = false;
+            spawnExplosion(game.particles, e.x, e.y, e.color, 25);
+            game.screenShake = std::max(game.screenShake, 8);
+            int reward = 10 * e.maxHp;
+            game.score += reward;
+            if (owner >= 0 && owner < GameEngine::MAX_PLAYERS) {
+                game.money[owner] += reward;
+            }
+        } else {
+            spawnExplosion(game.particles, e.x, e.y, "#fff", 4);
+        }
+    }
+
+    for (int pi = 0; pi < GameEngine::MAX_PLAYERS; pi++) {
+        if (pi == owner) continue;
+        if (!game.playerActive[pi] || !game.players[pi].alive) continue;
+        if (game.players[pi].invuln > 0) continue;
+        if (!laserSegmentHitsTank(sx, sy, ex, ey, game.players[pi].x, game.players[pi].y)) continue;
+        hurtPlayerBurst(game, pi, dmg);
+    }
+}
+
+static void updateLaserBeamsImpl(GameEngine& game) {
+    for (int i = 0; i < GameEngine::MAX_PLAYERS; i++) {
+        if (game.laserBeam[i].ttl > 0)
+            game.laserBeam[i].ttl--;
+    }
+}
+
 } // namespace
+
+void fireLaser(GameEngine& game, Tank& tank, int owner) {
+    fireLaserImpl(game, tank, owner);
+}
+
+void updateLaserBeams(GameEngine& game) {
+    updateLaserBeamsImpl(game);
+}
 
 void shootBullet(GameEngine& game, Tank& tank, int owner) {
     if (tank.cooldownTimer > 0) return;

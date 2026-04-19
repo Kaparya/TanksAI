@@ -38,6 +38,9 @@ public:
     int money[MAX_PLAYERS] = {0, 0};
     int waveClearTimer = 0;
 
+    // Laser beam visuals (one slot per player; ttl>0 means draw segment x0,y0 — x1,y1)
+    LaserBeamVisual laserBeam[MAX_PLAYERS];
+
     // Cached walls JSON (rebuilt only when walls change)
     mutable std::string wallsJson_;
     mutable bool wallsDirty_ = true;

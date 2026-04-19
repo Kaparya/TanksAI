@@ -11,6 +11,7 @@ static const int UPGRADE_COSTS[3][3] = {
     {0,  250,  1000},  // armor
 };
 static constexpr int EXPLOSIVE_AMMO_COST = 300;
+static constexpr int LASER_WEAPON_COST = 500;
 
 static const int IDX_DAMAGE = 0;
 static const int IDX_SIZE   = 1;
@@ -51,6 +52,12 @@ bool buyUpgrade(GameEngine& game, int playerId, const std::string& upgrade) {
         if (game.money[playerId] < EXPLOSIVE_AMMO_COST) return false;
         game.money[playerId] -= EXPLOSIVE_AMMO_COST;
         p.explosiveAmmo = true;
+        return true;
+    } else if (upgrade == "laser") {
+        if (p.laserWeapon) return false;
+        if (game.money[playerId] < LASER_WEAPON_COST) return false;
+        game.money[playerId] -= LASER_WEAPON_COST;
+        p.laserWeapon = true;
         return true;
     }
     return false;

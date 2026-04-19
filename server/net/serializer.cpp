@@ -87,7 +87,26 @@ std::string serializeState(const GameEngine& game) {
         o += ",\"bulletSizeLevel\":"; appendInt(o, p.bulletSizeLevel);
         o += ",\"armorLevel\":"; appendInt(o, p.armorLevel);
         o += ",\"explosiveAmmo\":"; o += (p.explosiveAmmo ? "true" : "false");
+        o += ",\"laserWeapon\":"; o += (p.laserWeapon ? "true" : "false");
         o += ",\"color\":\""; o += escStr(p.color); o += "\"}";
+    }
+    o += "]";
+
+    // Laser beam visuals (for client)
+    o += ",\"lasers\":[";
+    bool firstLaser = true;
+    for (int i = 0; i < GameEngine::MAX_PLAYERS; i++) {
+        if (!game.playerActive[i]) continue;
+        const auto& lb = game.laserBeam[i];
+        if (lb.ttl <= 0) continue;
+        if (!firstLaser) o += ",";
+        firstLaser = false;
+        o += "{\"x0\":"; appendFloat(o, lb.x0);
+        o += ",\"y0\":"; appendFloat(o, lb.y0);
+        o += ",\"x1\":"; appendFloat(o, lb.x1);
+        o += ",\"y1\":"; appendFloat(o, lb.y1);
+        o += ",\"ttl\":"; appendInt(o, lb.ttl);
+        o += ",\"owner\":"; appendInt(o, i); o += "}";
     }
     o += "]";
 
