@@ -3,8 +3,8 @@ const BulletRenderer = (() => {
     if (!bullets) return;
     for (const b of bullets) {
       const isEnemy = b.owner < 0;
-      const bulletColor = isEnemy ? '#ff5252' : '#ffd740';
-      const glowColor = isEnemy ? 'rgba(255,82,82,.35)' : 'rgba(255,215,64,.35)';
+      const bulletColor = isEnemy ? '#ff5252' : (b.explosive ? '#ff6d00' : '#ffd740');
+      const glowColor = isEnemy ? 'rgba(255,82,82,.35)' : (b.explosive ? 'rgba(255,109,0,.45)' : 'rgba(255,215,64,.35)');
       const r = b.radius || 3.5;
       const glowR = r * 2.5;
 

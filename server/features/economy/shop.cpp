@@ -10,6 +10,8 @@ static const int UPGRADE_COSTS[3][3] = {
     {0,  20,  60},  // size
     {0,  250,  1000},  // armor
 };
+static constexpr int EXPLOSIVE_AMMO_COST = 300;
+
 static const int IDX_DAMAGE = 0;
 static const int IDX_SIZE   = 1;
 static const int IDX_ARMOR  = 2;
@@ -43,6 +45,12 @@ bool buyUpgrade(GameEngine& game, int playerId, const std::string& upgrade) {
         p.armorLevel++;
         p.maxHp = p.armorLevel; // Lv1=1 hp, Lv2=2 hp, Lv3=3 hp per life
         p.hp = p.maxHp;         // restore to full on upgrade
+        return true;
+    } else if (upgrade == "explosive") {
+        if (p.explosiveAmmo) return false;
+        if (game.money[playerId] < EXPLOSIVE_AMMO_COST) return false;
+        game.money[playerId] -= EXPLOSIVE_AMMO_COST;
+        p.explosiveAmmo = true;
         return true;
     }
     return false;

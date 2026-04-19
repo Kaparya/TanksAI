@@ -25,6 +25,8 @@ struct Tank {
     int bulletSizeLevel = 1;
     // Armor upgrade (players only) — level 1 = none, 2 = light, 3 = heavy
     int armorLevel = 1;
+    // Explosive ammo (players only) — one-time shop purchase; bullets deal AoE on impact
+    bool explosiveAmmo = false;
     // AI fields (enemies only)
     int aiTimer = 0;
     int aiDir = 2;
@@ -37,6 +39,7 @@ struct Bullet {
     bool dead = false;
     int damage = 1;
     float radius = 3.f;
+    bool explosive = false; // player upgrade: radial damage on detonation
 };
 
 struct Particle {

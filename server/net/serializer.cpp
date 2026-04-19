@@ -86,6 +86,7 @@ std::string serializeState(const GameEngine& game) {
         o += ",\"bulletDmgLevel\":"; appendInt(o, p.bulletDmgLevel);
         o += ",\"bulletSizeLevel\":"; appendInt(o, p.bulletSizeLevel);
         o += ",\"armorLevel\":"; appendInt(o, p.armorLevel);
+        o += ",\"explosiveAmmo\":"; o += (p.explosiveAmmo ? "true" : "false");
         o += ",\"color\":\""; o += escStr(p.color); o += "\"}";
     }
     o += "]";
@@ -122,7 +123,8 @@ std::string serializeState(const GameEngine& game) {
         o += ",\"vx\":"; appendFloat(o, b.vx);
         o += ",\"vy\":"; appendFloat(o, b.vy);
         o += ",\"owner\":"; appendInt(o, b.owner);
-        o += ",\"radius\":"; appendFloat(o, b.radius); o += "}";
+        o += ",\"radius\":"; appendFloat(o, b.radius);
+        o += ",\"explosive\":"; o += (b.explosive ? "true" : "false"); o += "}";
     }
     o += "]";
 

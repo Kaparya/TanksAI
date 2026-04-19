@@ -357,7 +357,15 @@ canvas#c { display: block; border-radius: 2px; }
 }
 
 .wc-shop-items {
-  display: flex; gap: 16px; justify-content: center;
+  display: flex; flex-wrap: wrap; gap: 16px; justify-content: center;
+  max-width: 820px;
+  margin: 0 auto;
+}
+
+.wc-shop-item-wide {
+  flex: 1 1 100%;
+  max-width: 520px;
+  justify-content: center;
 }
 
 .wc-shop-item {
@@ -379,6 +387,13 @@ canvas#c { display: block; border-radius: 2px; }
 .wc-item-name {
   font-size: 12px; text-transform: uppercase;
   letter-spacing: 2px; color: var(--clr-text);
+  margin-bottom: 4px;
+}
+
+.wc-item-desc {
+  font-size: 10px;
+  color: var(--clr-text-dim);
+  letter-spacing: 1px;
   margin-bottom: 4px;
 }
 

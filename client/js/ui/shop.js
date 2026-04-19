@@ -5,6 +5,7 @@ const Shop = (() => {
     damage: [0, 25, 75],
     size:   [0, 20, 60],
     armor:  [0, 250, 1000],
+    explosive: 300, // one-time, mirrors EXPLOSIVE_AMMO_COST in server/features/economy/shop.cpp
   };
 
   function levelStars(level, max) {
@@ -62,11 +63,22 @@ const Shop = (() => {
           '<div class="wc-item-cost" id="wc-armor-cost">$25</div>' +
           '<button class="btn wc-buy-btn" id="wc-btn-armor">Buy</button>' +
         '</div>' +
+        '<div class="wc-shop-item wc-shop-item-wide">' +
+          '<div class="wc-item-icon">\uD83D\uDCA3</div>' +
+          '<div class="wc-item-info">' +
+            '<div class="wc-item-name">Explosive Ammo</div>' +
+            '<div class="wc-item-desc">AoE damage on impact</div>' +
+            '<div class="wc-item-stars" id="wc-exp-stars">\u2014</div>' +
+          '</div>' +
+          '<div class="wc-item-cost" id="wc-exp-cost">$300</div>' +
+          '<button class="btn wc-buy-btn" id="wc-btn-explosive">Buy</button>' +
+        '</div>' +
       '</div>';
 
     document.getElementById('wc-btn-damage').addEventListener('click', () => Network.sendBuy('damage'));
     document.getElementById('wc-btn-size').addEventListener('click', () => Network.sendBuy('size'));
     document.getElementById('wc-btn-armor').addEventListener('click', () => Network.sendBuy('armor'));
+    document.getElementById('wc-btn-explosive').addEventListener('click', () => Network.sendBuy('explosive'));
 
     updateWaveClear(state);
     waveClearEl.classList.add('active');
@@ -111,6 +123,16 @@ const Shop = (() => {
     if (armorStarsEl) armorStarsEl.textContent = levelStars(armorLevel, 3);
     if (armorCostEl) armorCostEl.textContent = armorMaxed ? 'MAX' : '$' + armorCost;
     if (armorBtn) armorBtn.disabled = armorMaxed || money < armorCost;
+
+    // Explosive ammo (one-time)
+    const hasExplosive = !!me.explosiveAmmo;
+    const expCost = UPGRADE_COSTS.explosive;
+    const expStarsEl = document.getElementById('wc-exp-stars');
+    const expCostEl = document.getElementById('wc-exp-cost');
+    const expBtn = document.getElementById('wc-btn-explosive');
+    if (expStarsEl) expStarsEl.textContent = hasExplosive ? 'Owned' : 'Not owned';
+    if (expCostEl) expCostEl.textContent = hasExplosive ? '\u2014' : '$' + expCost;
+    if (expBtn) expBtn.disabled = hasExplosive || money < expCost;
 
     // Also update per-player money cards
     for (const p of (state.players || [])) {
